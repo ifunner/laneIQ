@@ -330,6 +330,35 @@
   .holeline.hl-head{border-bottom:1px solid var(--line);padding-bottom:7px}
   .holeline.hl-head span{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-2)}
 
+  /* ---------- The 21 — routine intro ---------- */
+  .r21-hero{display:flex;align-items:center;gap:16px;background:linear-gradient(150deg,#143A30,#0E2A22 78%);border:1px solid rgba(70,201,138,.22);border-radius:18px;padding:18px}
+  .r21-big{flex:0 0 auto;text-align:center}
+  .r21-big .n{font-family:var(--mono);font-weight:700;font-size:52px;line-height:.9;color:var(--flag);letter-spacing:-.02em}
+  .r21-big .u{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted-2);font-weight:600;margin-top:7px}
+  .r21-body{flex:1;min-width:0}
+  .r21-body h3{font-family:var(--display);font-weight:700;font-size:18px;margin:0 0 5px;letter-spacing:-.01em}
+  .r21-body p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.5}
+  .r21-last{font-family:var(--mono);font-size:11px;color:var(--muted-2);margin-top:9px}
+  .r21-last b{color:var(--ink);font-weight:600}
+  .r21-last .beat{color:var(--flag)}
+
+  .r21-legs{display:grid;gap:10px}
+  .r21-leg{display:flex;gap:13px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:13px 14px;align-items:flex-start}
+  .r21-mini{flex:0 0 auto;width:42px;height:60px}
+  .r21-mini svg{width:100%;height:100%;display:block}
+  .r21-lc{flex:1;min-width:0}
+  .r21-lh{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .r21-step{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--flag);border:1px solid var(--line);border-radius:6px;padding:2px 7px;flex:0 0 auto}
+  .r21-lh h4{font-family:var(--display);font-weight:600;font-size:15px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
+  .r21-leg p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.5}
+  .r21-from{font-family:var(--mono);font-size:11px;color:var(--muted-2);margin-top:8px;letter-spacing:.01em;display:flex;gap:5px;align-items:baseline}
+  .r21-from b{color:var(--path);font-weight:600}
+
+  .r21-score{display:flex;gap:11px;align-items:flex-start;border:1px solid var(--line);border-left:3px solid var(--flag);border-radius:8px;padding:12px 13px;margin-top:14px;font-size:13px;line-height:1.5;color:var(--ink)}
+  .r21-score .ic{font-size:16px;line-height:1.35;flex:0 0 auto}
+  .r21-score .muted{color:var(--muted)}
+  .r21-score b{color:var(--ink);font-weight:600}
+
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -1001,7 +1030,7 @@ const ovRoot=$('#overlay-root');
 let setupState=null;
 
 function openSetup(which){
-  if(which==='routine'){ startRoutine(); return; }
+  if(which==='routine'){ openRoutineIntro(); return; }
   const def=DRILLS[which];
   setupState={ type:which, distance:6, balls:Store.get().settings.balls };
   renderSetup(def);
@@ -1212,6 +1241,77 @@ function renderRewardPopup(r, headline){
   $('#ok').onclick=()=>{ buzz(); closeOverlay(); render(); };
 }
 function countSuccess(d){ const def=DRILLS[d.type]; const keys=def.outcomes.filter(o=>o.success).map(o=>o.key); return d.putts.filter(p=>keys.includes(p)).length; }
+
+/* ----- per-leg mini lane glyph (matches the app's lane visual, GolfIQ palette) ----- */
+function legMiniSVG(type){
+  const lane=`<rect x="8" y="3" width="28" height="58" rx="9" fill="#0E2A22" stroke="#26483D"/>
+    <line x1="22" y1="8" x2="22" y2="57" stroke="#9DB3A6" stroke-opacity=".3" stroke-dasharray="1.5 4"/>
+    <circle cx="22" cy="53" r="3.2" fill="#F2EBDA"/>`;
+  let inner='';
+  if(type==='make'){
+    inner=`<circle cx="22" cy="15" r="4.6" fill="#0A201A" stroke="#F4D03F" stroke-width="2.2"/>`;
+  } else if(type==='gate'){
+    inner=`<rect x="15" y="12" width="2.4" height="6.5" rx="1.2" fill="#9DB3A6"/>
+           <rect x="26.6" y="12" width="2.4" height="6.5" rx="1.2" fill="#9DB3A6"/>
+           <circle cx="22" cy="15.3" r="1.7" fill="#F4D03F"/>`;
+  } else { /* goodzone */
+    inner=`<rect x="8" y="9" width="28" height="13" fill="rgba(70,201,138,.16)"/>
+           <line x1="8" y1="9" x2="36" y2="9" stroke="#E0A13B" stroke-opacity=".4" stroke-dasharray="2 3"/>
+           <circle cx="22" cy="27" r="4.2" fill="#0A201A" stroke="#F4D03F" stroke-width="2"/>`;
+  }
+  return `<svg viewBox="0 0 44 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${lane}${inner}</svg>`;
+}
+
+/* ----- The 21: explainer overlay shown before the routine begins ----- */
+function openRoutineIntro(){
+  const last=lastRoutine();
+  const legs=[
+    { n:1, type:'gate',     dist:null, title:'Start Line', blurb:'Roll 7 through the gate, dead on your aim line — groove a square face and a pure start.' },
+    { n:2, type:'make',     dist:6,    title:'Makes · 6ft', blurb:'Hole out 7 from six feet. This is your money zone — just bank the makes.' },
+    { n:3, type:'goodzone', dist:null, title:'Good Zone',  blurb:'Lag 7 past the cup into the green zone. Never leave it short — win the speed.' }
+  ];
+  const legRows=legs.map(l=>{
+    const s=setupFor(l.type,l.dist), d=DRILLS[l.type];
+    return `<div class="r21-leg">
+      <div class="r21-mini">${legMiniSVG(l.type)}</div>
+      <div class="r21-lc">
+        <div class="r21-lh">
+          <span class="r21-step">${l.n}</span>
+          <h4>${l.title}</h4>
+          <span class="pill ${d.tag}">${d.tagLabel}</span>
+        </div>
+        <p>${l.blurb}</p>
+        <div class="r21-from"><span>📍</span><span>7 balls · from <b>${s.from}</b> → <b>${s.to}</b></span></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  ovRoot.innerHTML=`<div class="overlay">
+    <div class="ov-top">
+      <div><div class="name">The 21</div><div class="sub">Daily routine · 21 putts</div></div>
+      <button class="iconbtn" id="close">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:6px 18px 10px;-webkit-overflow-scrolling:touch">
+      <div class="r21-hero">
+        <div class="r21-big"><div class="n">21</div><span class="u">one number</span></div>
+        <div class="r21-body">
+          <h3>One pass. Three games.</h3>
+          <p>Seven start-line, seven makes from 6ft, seven good-zone. One point for every ball that finds its target.</p>
+          ${last?`<div class="r21-last">Last pass <b>${last.score}/21</b> · ${fmtDay(last.date.slice(0,10))}${last.score<21?` · <span class="beat">beat it</span>`:''}</div>`:''}
+        </div>
+      </div>
+      <div class="sect-label" style="margin-top:22px">The three legs</div>
+      <div class="r21-legs">${legRows}</div>
+      <div class="r21-score">
+        <span class="ic">🎯</span>
+        <div><b>How it scores.</b> <span class="muted">Each leg is 7 balls. Every make, clean start, and good-zone lag counts as one point — add all three for your score out of 21. It logs as a single number in History.</span></div>
+      </div>
+    </div>
+    <div class="controls"><button class="finish" id="go">Start The 21 →</button></div>
+  </div>`;
+  $('#close').onclick=closeOverlay;
+  $('#go').onclick=()=>{ buzz(); startRoutine(); };
+}
 
 function startRoutine(){
   const steps=[
