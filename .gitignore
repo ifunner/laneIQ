@@ -1,0 +1,10 @@
+# OS
+.DS_Store
+**/.DS_Store
+
+# Dependencies / build scratch
+node_modules/
+.tmp-*/
+
+# Design references / source material (kept locally, not part of the shipped app)
+designs/

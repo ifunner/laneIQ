@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<meta name="theme-color" content="#0A201A" />
+<meta name="description" content="LaneIQ — putting practice tracker for the WellPutt 10ft mat. Part of the GolfIQ suite." />
+<title>LaneIQ — WellPutt Practice</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml" />
+<link rel="icon" href="favicon.png" sizes="any" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="manifest" href="manifest.json" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="LaneIQ" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    /* --- GolfIQ canonical tokens --- */
+    --felt:#0E2A22; --felt-deep:#0A201A; --panel:#10322A; --panel-hi:#143A30;
+    --ink:#F2EBDA; --ink-dim:#9DB3A6; --sage:#6E8F7E; --line:#26483D;
+    --flag:#F4D03F; --path:#46C98A; --red:#E06A5C; --uphill:#7FC8FF;
+    --flag-deep:#D9AE1B; --flag-glow:rgba(244,208,63,.13);
+    --path-deep:#1F8F5F; --path-glow:rgba(70,201,138,.16);
+    /* app-extension: warm "long / over-par" tri-state (kept distinct from --flag) */
+    --amber:#E0A13B; --amber-glow:rgba(224,161,59,.12);
+
+    /* --- legacy aliases (mapped 1:1 to GolfIQ tokens; keep names for the engine) --- */
+    --bg:var(--felt-deep); --surface:var(--felt); --surface-2:var(--panel); --surface-3:var(--panel-hi);
+    --line-soft:#1E4033;
+    --muted:var(--ink-dim); --muted-2:var(--sage);
+    --green:var(--path); --green-deep:var(--path-deep); --green-glow:var(--path-glow);
+    --clay:var(--red); --blue:var(--uphill);
+
+    --display:'Space Grotesk',ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+    --body:'Space Grotesk',ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    --safe-b:env(safe-area-inset-bottom,0px);
+    --safe-t:env(safe-area-inset-top,0px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  html{background:var(--felt-deep)}
+  body{
+    color:var(--ink);font-family:var(--body);
+    overscroll-behavior-y:none;-webkit-font-smoothing:antialiased;
+    line-height:1.45;
+    background-color:var(--felt-deep);
+    background-image:radial-gradient(120% 60% at 50% -10%,#16382d 0%,var(--felt) 42%,var(--felt-deep) 100%);
+    background-attachment:fixed;
+  }
+  .mono,body .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  #app{max-width:520px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;position:relative}
+  .scroll{flex:1;overflow-y:auto;padding:calc(var(--safe-t) + 4px) 18px 120px;-webkit-overflow-scrolling:touch}
+
+  /* ---------- header ---------- */
+  .top{display:flex;align-items:flex-end;justify-content:space-between;padding-top:14px;margin-bottom:18px}
+  .brand{display:flex;align-items:center;gap:11px}
+  .brand .mark{flex:0 0 auto;width:34px;height:44px;display:block}
+  .brand .mark svg{width:100%;height:100%;display:block}
+  .brandtext{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .brand .eyebrow{font-family:var(--display);font-weight:600;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--sage)}
+  .brand h1{font-family:var(--display);font-weight:500;font-size:26px;letter-spacing:-.03em;margin:0;line-height:1}
+  .brand h1 b{color:var(--path);font-weight:700;letter-spacing:-.01em}
+
+  .streak{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:7px 13px 7px 11px}
+  .streak .flame{font-size:15px;filter:saturate(1.2)}
+  .streak .n{font-family:var(--mono);font-weight:600;font-size:15px}
+  .streak .lbl{font-size:11px;color:var(--muted);letter-spacing:.02em}
+
+  /* ---------- section ---------- */
+  .sect-label{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted-2);margin:26px 2px 12px}
+  .sect-label:first-of-type{margin-top:0}
+
+  /* ---------- drill cards ---------- */
+  .grid{display:grid;gap:12px}
+  .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px 16px 15px;
+    position:relative;overflow:hidden;cursor:pointer;transition:transform .12s ease,border-color .18s ease;
+    -webkit-user-select:none;user-select:none;
+  }
+  .card:active{transform:scale(.985)}
+  .card .ct{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .card h3{font-family:var(--display);font-weight:600;font-size:18px;margin:0 0 3px;letter-spacing:-.01em}
+  .card p{margin:0;font-size:13px;color:var(--muted);max-width:30ch}
+  .card .stat{font-family:var(--mono);font-size:13px;color:var(--muted);margin-top:11px;display:flex;align-items:center;gap:7px}
+  .card .stat b{color:var(--ink);font-weight:600}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;border-radius:7px;border:1px solid var(--line)}
+  .pill.acc{color:var(--green);border-color:rgba(70,201,138,.3);background:var(--green-glow)}
+  .pill.dist{color:var(--amber);border-color:rgba(224,161,59,.28);background:rgba(224,161,59,.08)}
+  .pill.line{color:var(--blue);border-color:rgba(127,200,255,.3);background:rgba(127,200,255,.08)}
+  .card.feature{background:linear-gradient(150deg,#143A30,#0E2A22 75%);border-color:rgba(70,201,138,.22)}
+  .card.feature h3{font-size:20px}
+  .glyph{flex:0 0 auto;width:34px;height:46px;border-radius:6px;border:1px solid var(--line);background:var(--surface-2);position:relative}
+  .glyph::before{content:"";position:absolute;left:50%;top:6px;bottom:6px;width:0;border-left:1.5px dashed var(--muted-2);transform:translateX(-50%)}
+  .glyph i{position:absolute;width:7px;height:7px;border-radius:50%;left:50%;transform:translateX(-50%);background:var(--green)}
+
+  /* ---------- bottom nav ---------- */
+  nav{position:fixed;left:0;right:0;bottom:0;z-index:40;
+    padding:6px 8px calc(8px + var(--safe-b));
+    background:rgba(9,26,21,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border-top:1px solid var(--line)}
+  .nav-inner{display:flex;gap:4px;margin:0 auto;width:100%;max-width:520px}
+  .nav-inner button{flex:1;background:none;border:0;color:var(--ink-dim);font-family:var(--body);font-weight:700;font-size:10.5px;letter-spacing:.04em;
+    padding:7px 0;border-radius:12px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;transition:.15s}
+  .nav-inner button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.9}
+  .nav-inner button.on{color:var(--flag)}
+  .nav-inner button.on svg{stroke:var(--flag)}
+
+  /* ---------- active drill overlay ---------- */
+  .overlay{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column;
+    max-width:560px;margin:0 auto;animation:slideup .26s cubic-bezier(.2,.8,.2,1)}
+  @keyframes slideup{from{transform:translateY(14px);opacity:.4}to{transform:translateY(0);opacity:1}}
+  .ov-top{display:flex;align-items:center;justify-content:space-between;padding:calc(var(--safe-t) + 14px) 18px 6px}
+  .ov-top .name{font-family:var(--display);font-weight:600;font-size:17px}
+  .ov-top .sub{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.06em}
+  .iconbtn{background:var(--surface);border:1px solid var(--line);color:var(--ink);width:38px;height:38px;border-radius:11px;font-size:17px;cursor:pointer;display:grid;place-items:center}
+
+  .readout{display:flex;align-items:baseline;justify-content:center;gap:18px;padding:6px 18px 2px}
+  .readout .big{font-family:var(--mono);font-weight:600;font-size:54px;letter-spacing:-.02em;line-height:1}
+  .readout .big small{font-size:22px;color:var(--muted)}
+  .readout .meta{display:flex;flex-direction:column;gap:2px}
+  .readout .meta .k{font-family:var(--mono);font-size:11px;color:var(--muted-2);letter-spacing:.12em;text-transform:uppercase}
+  .readout .meta .v{font-family:var(--mono);font-size:18px;font-weight:600}
+
+  .lane-wrap{flex:1;display:grid;place-items:center;min-height:0;padding:8px 0 4px}
+  .lane-wrap svg{height:100%;max-height:46vh;width:auto}
+
+  .controls{padding:8px 16px calc(18px + var(--safe-b))}
+  .runrow{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;min-height:20px}
+  .runrow .dots{display:flex;gap:5px;flex-wrap:wrap}
+  .runrow .dot{width:9px;height:9px;border-radius:50%;background:var(--surface-3);border:1px solid var(--line)}
+  .runrow .undo{background:none;border:0;color:var(--muted);font-family:var(--mono);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;padding:4px}
+  .runrow .undo:disabled{opacity:.3}
+  .btn-row{display:flex;gap:10px}
+  .obtn{flex:1;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:15px;
+    padding:18px 8px;font-family:var(--display);font-weight:600;font-size:16px;cursor:pointer;display:flex;
+    flex-direction:column;align-items:center;gap:3px;transition:transform .1s,filter .1s;-webkit-user-select:none;user-select:none}
+  .obtn:active{transform:scale(.95)}
+  .obtn .k{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.7;font-weight:500}
+  .obtn.good{background:rgba(70,201,138,.13);border-color:rgba(70,201,138,.4);color:var(--green)}
+  .obtn.bad{background:rgba(224,106,92,.1);border-color:rgba(224,106,92,.36);color:var(--clay)}
+  .obtn.long{background:rgba(224,161,59,.1);border-color:rgba(224,161,59,.34);color:var(--amber)}
+  .obtn.neutral{background:var(--surface)}
+  .finish{width:100%;margin-top:12px;border:0;border-radius:15px;padding:16px;background:var(--flag);color:#1a1500;
+    font-family:var(--display);font-weight:700;font-size:16px;cursor:pointer;letter-spacing:-.01em}
+  .finish:active{filter:brightness(.93)}
+
+  /* distance segmented control */
+  .seg{display:flex;gap:7px;margin:14px 0 4px}
+  .seg button{flex:1;background:var(--surface);border:1px solid var(--line);color:var(--muted);border-radius:12px;
+    padding:13px 4px;font-family:var(--mono);font-weight:600;font-size:15px;cursor:pointer;transition:.14s}
+  .seg button.on{background:var(--flag);color:#1a1500;border-color:var(--flag)}
+  .seg button.on .u{color:#5a4b00}
+  .seg button .u{font-size:10px;color:var(--muted-2);display:block;letter-spacing:.1em;margin-top:1px}
+
+  /* setup sheet */
+  .sheet-label{font-size:13px;color:var(--muted);margin:18px 2px 0;font-weight:500}
+  .ballrow{display:flex;gap:8px;margin-top:9px}
+  .ballrow button{flex:1;background:var(--surface);border:1px solid var(--line);color:var(--muted);border-radius:12px;padding:12px 4px;font-family:var(--mono);font-size:15px;font-weight:600;cursor:pointer}
+  .ballrow button.on{background:var(--flag);color:#1a1500;border-color:var(--flag)}
+
+  /* ---------- stats ---------- */
+  .kpis{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .kpi{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:13px 12px}
+  .kpi .v{font-family:var(--mono);font-weight:600;font-size:24px;line-height:1;letter-spacing:-.01em}
+  .kpi .v small{font-size:13px;color:var(--muted)}
+  .kpi .k{font-size:11px;color:var(--muted);margin-top:5px;letter-spacing:.01em}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;margin-top:12px}
+  .panel h4{font-family:var(--display);font-weight:600;font-size:15px;margin:0 0 2px}
+  .panel .hint{font-size:12px;color:var(--muted);margin:0 0 14px}
+  .distrow{display:flex;align-items:center;gap:12px;margin:11px 0}
+  .distrow .lab{font-family:var(--mono);font-size:13px;width:42px;color:var(--ink);flex:0 0 auto}
+  .bar{flex:1;height:9px;background:var(--surface-3);border-radius:6px;overflow:hidden}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--green-deep),var(--green));border-radius:6px;transition:width .5s}
+  .distrow .pct{font-family:var(--mono);font-size:13px;width:54px;text-align:right;color:var(--muted);flex:0 0 auto}
+  .distrow .pct b{color:var(--ink);font-weight:600}
+  .bias{display:flex;height:34px;border-radius:10px;overflow:hidden;border:1px solid var(--line);margin-top:4px}
+  .bias div{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;font-weight:600;min-width:0}
+  .bias .s{background:rgba(224,106,92,.22);color:var(--clay)}
+  .bias .g{background:rgba(70,201,138,.2);color:var(--green)}
+  .bias .l{background:rgba(224,161,59,.18);color:var(--amber)}
+  .biaslab{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);margin-top:7px}
+  .spark{margin-top:6px}
+
+  /* ---------- history ---------- */
+  .daygroup{margin-top:18px}
+  .daygroup .dh{display:flex;align-items:baseline;justify-content:space-between;margin:0 2px 9px}
+  .daygroup .dh .d{font-family:var(--display);font-weight:600;font-size:15px}
+  .daygroup .dh .c{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .hrow{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .hrow .l{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .hrow .l .t{font-weight:600;font-size:14px}
+  .hrow .l .s{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .hrow .score{font-family:var(--mono);font-weight:600;font-size:18px;flex:0 0 auto}
+  .hrow .score small{font-size:12px;color:var(--muted)}
+
+  .empty{text-align:center;padding:52px 24px;color:var(--muted)}
+  .empty .ic{font-size:30px;margin-bottom:12px;opacity:.7}
+  .empty h4{font-family:var(--display);color:var(--ink);font-weight:600;margin:0 0 6px;font-size:17px}
+  .empty p{margin:0;font-size:13px;max-width:30ch;margin-inline:auto}
+
+  .toast{position:fixed;left:50%;bottom:calc(96px + var(--safe-b));transform:translateX(-50%) translateY(8px);
+    background:var(--surface-3);border:1px solid var(--line);color:var(--ink);padding:11px 18px;border-radius:12px;
+    font-size:13px;font-weight:500;opacity:0;pointer-events:none;transition:.25s;z-index:80;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  .footnote{text-align:center;font-size:11px;color:var(--muted-2);margin-top:30px;font-family:var(--mono);letter-spacing:.04em}
+  .danger{background:none;border:0;color:var(--muted-2);font-size:12px;text-decoration:underline;cursor:pointer;display:block;margin:14px auto 0}
+  /* ---------- course mode ---------- */
+  .card.course{background:linear-gradient(155deg,#143A30,#0E2A22 80%)}
+  .medal{font-size:16px;color:var(--mc,#F4D03F);letter-spacing:1px;flex:0 0 auto}
+  .course-hero{display:flex;gap:10px}
+  .course-hero>div{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:11px 8px;text-align:center}
+  .ch-k{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-2)}
+  .ch-v{font-family:var(--mono);font-size:21px;font-weight:600;margin-top:4px}
+  .holelist{flex:1;overflow-y:auto;padding:6px 18px 8px;-webkit-overflow-scrolling:touch}
+  .holeline{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line-soft)}
+  .holeline .hno{font-family:var(--mono);font-size:12px;color:var(--muted-2);width:20px;flex:0 0 auto;text-align:right}
+  .holeline .hnm{font-weight:600;font-size:13px;flex:0 0 auto;width:82px;letter-spacing:-.01em}
+  .holeline .htask{font-size:12px;color:var(--muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .holeline .hpar{font-family:var(--mono);font-size:10px;color:var(--muted-2);letter-spacing:.08em;flex:0 0 auto}
+
+  .result{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;animation:slideup .24s cubic-bezier(.2,.8,.2,1)}
+  .result .term{font-family:var(--display);font-weight:700;font-size:46px;letter-spacing:-.02em;line-height:1}
+  .result .hs{font-family:var(--mono);font-size:14px;color:var(--muted);margin-top:8px}
+  .result .runlbl{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted-2)}
+  .result .run{font-family:var(--mono);font-size:56px;font-weight:600;line-height:1;margin-top:6px}
+  .result .next{margin-top:38px;border:0;border-radius:15px;padding:16px 42px;background:var(--flag);color:#1a1500;font-family:var(--display);font-weight:700;font-size:16px;cursor:pointer}
+  .result .next:active{filter:brightness(.93)}
+
+  .scorecard{flex:1;overflow-y:auto;padding:0 18px;-webkit-overflow-scrolling:touch}
+  .sc-medal{text-align:center;padding:16px 0 2px}
+  .sc-medal .star{font-size:34px;line-height:1}
+  .sc-medal .mlbl{font-family:var(--display);font-weight:700;font-size:24px;margin-top:6px;letter-spacing:-.01em}
+  .sc-topar{text-align:center;font-family:var(--mono);font-weight:600;font-size:54px;line-height:1;margin:8px 0 0}
+  .sc-sub{text-align:center;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted-2);margin-top:2px}
+  .newbest{display:inline-block;background:var(--green-glow);border:1px solid rgba(70,201,138,.4);color:var(--green);font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:5px 12px;border-radius:8px;margin-top:10px}
+  .sc-grid{display:grid;grid-template-columns:repeat(9,1fr);gap:5px;margin:8px 0}
+  .sc-grid:first-of-type{margin-top:18px}
+  .sc-cell{aspect-ratio:.82;border-radius:8px;border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;background:var(--surface)}
+  .sc-cell .n{font-family:var(--mono);font-size:9px;color:var(--muted-2)}
+  .sc-cell .v{font-family:var(--mono);font-size:13px;font-weight:600}
+  .sc-cell.u{border-color:rgba(70,201,138,.5);background:rgba(70,201,138,.1)}
+  .sc-cell.u .v{color:var(--green)}
+  .sc-cell.o{border-color:rgba(224,106,92,.4);background:rgba(224,106,92,.08)}
+  .sc-cell.o .v{color:var(--clay)}
+
+  /* ---------- level chip + header stats ---------- */
+  .hstats{display:flex;align-items:center;gap:8px}
+  .lvchip{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 11px;display:flex;flex-direction:column;gap:4px;cursor:pointer;min-width:60px}
+  .lvchip .lv{font-family:var(--mono);font-weight:600;font-size:13px;color:var(--green);line-height:1}
+  .lvchip .lvbar{height:3px;background:var(--surface-3);border-radius:2px;overflow:hidden}
+  .lvchip .lvbar i{display:block;height:100%;background:var(--green);border-radius:2px}
+
+  /* ---------- mat guide ---------- */
+  .card.matguide{margin-bottom:6px}
+  .mg-thumb{flex:0 0 auto;width:38px;height:56px}
+  .mg-thumb svg{width:100%;height:100%}
+  .mg-row{display:flex;gap:12px;padding:11px 2px;border-bottom:1px solid var(--line-soft);align-items:baseline}
+  .mg-name{font-family:var(--display);font-weight:600;font-size:13px;flex:0 0 88px;letter-spacing:-.01em}
+  .mg-instr{font-size:13px;color:var(--muted);flex:1;line-height:1.5}
+  .mg-instr b{color:var(--ink);font-weight:600}
+
+  /* setup callout + run setup strip */
+  .setup-callout{display:flex;gap:11px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:13px 14px;margin-top:16px}
+  .setup-callout .sc-pin{font-size:16px;line-height:1.3}
+  .setup-callout .sc-line{font-size:14px;font-weight:500}
+  .setup-callout .sc-line b{color:var(--green);font-weight:600}
+  .setup-callout .sc-note{font-size:12px;color:var(--muted);margin-top:3px}
+  .run-setup{margin:2px 18px 0;text-align:center;font-size:12px;color:var(--muted);font-weight:500}
+
+  /* ---------- rewards ---------- */
+  .levelcard{display:flex;gap:16px;align-items:center;background:linear-gradient(150deg,#143A30,#0E2A22 78%);border:1px solid rgba(70,201,138,.22);border-radius:18px;padding:18px}
+  .lc-ring{flex:0 0 auto;width:66px;height:66px;border-radius:50%;display:grid;place-items:center;background:var(--surface);border:2px solid var(--green)}
+  .lc-lv{font-family:var(--mono);font-weight:700;font-size:26px;color:var(--green)}
+  .lc-body{flex:1;min-width:0}
+  .lc-rank{font-family:var(--display);font-weight:700;font-size:19px;letter-spacing:-.01em}
+  .lc-xp{font-family:var(--mono);font-size:11px;color:var(--muted);margin:3px 0 7px}
+  .lc-track{height:7px;background:var(--surface-3);border-radius:5px;overflow:hidden}
+  .lc-track i{display:block;height:100%;background:linear-gradient(90deg,var(--green-deep),var(--green));border-radius:5px;transition:width .6s}
+  .lc-total{font-family:var(--mono);font-size:11px;color:var(--muted-2);margin-top:6px}
+
+  .ach-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .ach{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:13px 13px 12px;position:relative}
+  .ach.off{opacity:.62}
+  .ach.on{border-color:rgba(70,201,138,.32);background:linear-gradient(160deg,#143A30,#0E2A22 80%)}
+  .ach-ic{font-size:22px;line-height:1;margin-bottom:8px;filter:grayscale(.6)}
+  .ach.on .ach-ic{filter:none}
+  .ach-n{font-family:var(--display);font-weight:600;font-size:14px}
+  .ach-d{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.35}
+  .ach-done{font-family:var(--mono);font-size:11px;color:var(--green);margin-top:9px;font-weight:600}
+  .ach-bar{height:5px;background:var(--surface-3);border-radius:3px;overflow:hidden;margin-top:9px}
+  .ach-bar i{display:block;height:100%;background:var(--muted-2);border-radius:3px}
+  .ach-p{font-family:var(--mono);font-size:10px;color:var(--muted-2);margin-top:4px}
+
+  /* reward popups */
+  .reward-lvl{font-family:var(--mono);font-size:12px;letter-spacing:.28em;color:var(--green);margin-bottom:2px}
+  .reward-xp{font-family:var(--mono);font-weight:600;font-size:22px;color:var(--green);margin-top:16px}
+  .reward-badges{display:flex;flex-direction:column;gap:8px;margin-top:20px;width:100%;max-width:320px}
+  .rb{display:flex;align-items:center;gap:11px;background:var(--surface);border:1px solid rgba(70,201,138,.3);border-radius:12px;padding:11px 13px;text-align:left}
+  .rb-ic{font-size:22px;flex:0 0 auto}
+  .rb-n{font-family:var(--display);font-weight:600;font-size:14px;flex:1}
+  .rb-t{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--green)}
+  .sc-reward{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line-soft)}
+  .sr-xp{font-family:var(--mono);font-weight:600;font-size:16px;color:var(--green)}
+  .sr-lv{font-family:var(--mono);font-size:12px;color:var(--amber);border:1px solid rgba(224,161,59,.35);border-radius:7px;padding:3px 8px}
+
+  /* ---------- game-tracker readability ---------- */
+  .goal{margin:4px 18px 0;text-align:center;font-family:var(--mono);font-size:11.5px;letter-spacing:.01em;color:var(--muted)}
+  .repcount{font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:9px;text-align:center}
+  .repcount b{color:var(--ink);font-weight:600}
+  .tap-hint{text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2);margin:2px 0 9px}
+  .result .hres-made{font-family:var(--mono);font-size:14px;color:var(--muted);margin-top:10px}
+  .result .hres-par{font-family:var(--mono);font-size:12px;letter-spacing:.04em;margin-top:3px}
+  .sc-made{text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:14px}
+  .sc-made b{color:var(--ink);font-weight:600}
+  .sc-legend{display:flex;justify-content:center;gap:16px;margin-top:8px;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-2)}
+  .sc-legend span{display:flex;align-items:center;gap:5px}
+  .sc-legend i{width:9px;height:9px;border-radius:3px;display:inline-block}
+  .sc-legend i.u{background:var(--green)}
+  .sc-legend i.p{background:var(--surface-3);border:1px solid var(--line)}
+  .sc-legend i.o{background:var(--amber)}
+  .hole-legend{font-family:var(--mono);font-size:10.5px;color:var(--muted-2);margin:2px 2px 2px;letter-spacing:.01em}
+  .holeline.hl-head{border-bottom:1px solid var(--line);padding-bottom:7px}
+  .holeline.hl-head span{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-2)}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="scroll" id="screen"></div>
+  <nav id="nav"></nav>
+</div>
+<div id="overlay-root"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   Lane — WellPutt 10ft practice tracker
+   Single-file PWA. State persists in localStorage.
+   ============================================================ */
+
+/* ---------- storage (graceful fallback for sandboxed preview) ---------- */
+const Store = (() => {
+  const KEY = 'lane.wellputt.v1';
+  let mem = null;
+  function read(){
+    if (mem) return mem;
+    try { const raw = localStorage.getItem(KEY); mem = raw ? JSON.parse(raw) : null; }
+    catch(e){ mem = null; }
+    if(!mem) mem = { sessions:[], settings:{ balls:10 }, courses:{}, xp:0, achievements:{} };
+    if(!mem.courses) mem.courses = {};            // migrate older saves
+    if(mem.xp==null) mem.xp = 0;
+    if(!mem.achievements) mem.achievements = {};
+    return mem;
+  }
+  function write(){
+    try { localStorage.setItem(KEY, JSON.stringify(mem)); } catch(e){ /* in-memory only */ }
+  }
+  return {
+    get: read,
+    save: write,
+    addSession(s){ const d=read(); d.sessions.unshift(s); write(); },
+    setBalls(n){ const d=read(); d.settings.balls=n; write(); },
+    addXP(n){ const d=read(); d.xp=(d.xp||0)+n; write(); },
+    unlockAchievement(id){ const d=read(); if(!d.achievements[id]){ d.achievements[id]=new Date().toISOString(); write(); return true; } return false; },
+    courseResult(id,toPar,medal){
+      const d=read(); const c=d.courses[id]=d.courses[id]||{best:null,medal:null,plays:0};
+      c.plays++; c.lastDate=new Date().toISOString();
+      let newBest=false;
+      if(c.best==null || toPar<c.best){ c.best=toPar; c.medal=medal; newBest=true; }
+      write(); return { newBest, best:c.best, bestMedal:c.medal };
+    },
+    wipe(){ mem={ sessions:[], settings:{ balls:10 }, courses:{}, xp:0, achievements:{} }; write(); }
+  };
+})();
+
+/* ---------- drill catalog ---------- */
+const DRILLS = {
+  make: {
+    id:'make', name:'Make Test', tag:'acc', tagLabel:'Accuracy',
+    desc:'Hole out from a set distance. Track make rate and your best run.',
+    needsDistance:true,
+    outcomes:[
+      { key:'make', label:'Made',  sub:'in the hole', cls:'good',    success:true },
+      { key:'miss', label:'Missed',sub:'off line',    cls:'bad' }
+    ]
+  },
+  goodzone: {
+    id:'goodzone', name:'Good Zone', tag:'dist', tagLabel:'Distance',
+    desc:'Roll it past the hole into the good zone. Punish short, learn your bias.',
+    needsDistance:false,
+    outcomes:[
+      { key:'short', label:'Short', sub:'left short', cls:'bad' },
+      { key:'good',  label:'Good',  sub:'in the zone', cls:'good', success:true },
+      { key:'long',  label:'Long',  sub:'raced past', cls:'long' }
+    ]
+  },
+  gate: {
+    id:'gate', name:'Start Line', tag:'line', tagLabel:'Stroke',
+    desc:'Send it through the gate on your aim line. Clean starts, every time.',
+    needsDistance:false,
+    outcomes:[
+      { key:'through', label:'Through', sub:'on your line', cls:'good', success:true },
+      { key:'off',     label:'Off line',sub:'missed gate',  cls:'bad' }
+    ]
+  }
+};
+const DIST = [3,6,10]; // ft, the set positions on the 10ft mat
+
+/* ---------- 18-hole courses (3 levels, original holes built on the mat's real features) ---------- */
+const H = (name,type,dist,balls,par) => ({ name, type, dist, balls, par });
+const COURSES = {
+  green: {
+    name:'Home Green', level:'Foundations', tag:'acc',
+    blurb:'Short makes, clean starts, soft pace. Build the base.',
+    holes:[
+      H('Warm Up','make',3,4,3),  H('Center Cut','make',3,4,3), H('Gate Check','gate',null,4,3),
+      H('Six Footer','make',6,4,2),H('Lag Feel','goodzone',null,4,2),H('Short Stack','make',3,5,4),
+      H('Through It','gate',null,5,4),H('Zone In','goodzone',null,5,3),H('The Turn','make',6,4,2),
+      H('Steady','make',3,5,4),    H('Pace Lab','goodzone',null,5,3),H('Six Pack','make',6,5,3),
+      H('Line Up','gate',null,5,4),H('No Leaks','make',3,5,5),     H('Roll Past','goodzone',null,5,4),
+      H('Six & Sure','make',6,5,3),H('Lockdown','make',3,5,5),     H('Closer','make',6,5,3)
+    ]
+  },
+  back: {
+    name:'Back Nine', level:'Sharpen', tag:'line',
+    blurb:'Mid-range under load. Tens make their first appearance.',
+    holes:[
+      H('Loosen','make',6,4,3),    H('Gate Speed','gate',null,5,4),H('Ten Peek','make',10,4,1),
+      H('Zone Pro','goodzone',null,5,4),H('Six Lock','make',6,5,4),H('Ladder Base','make',3,5,5),
+      H('Mid Range','make',6,5,3), H('Tens','make',10,5,2),        H('Pace Master','goodzone',null,5,4),
+      H('Pure Line','gate',null,5,5),H('Six Under','make',6,5,4),  H('Long Look','make',10,5,2),
+      H('Zone Tight','goodzone',null,6,5),H('Pressure 6','make',6,5,5),H('Tenacity','make',10,5,3),
+      H('Gate Money','gate',null,5,5),H('Clutch Six','make',6,6,5),H('Sign It','make',10,5,3)
+    ]
+  },
+  tour: {
+    name:'Tour Card', level:'Pressure', tag:'dist',
+    blurb:'Must-make holes and full-length lag. No soft spots.',
+    holes:[
+      H('Stinger','make',6,5,4),   H('Ten Start','make',10,5,3), H('No Misses','make',6,5,5),
+      H('Zone Lock','goodzone',null,6,5),H('Gate Perfect','gate',null,5,5),H('Ten Pack','make',10,6,3),
+      H('Six Money','make',6,6,5), H('Lag Tour','goodzone',null,6,5),H('Turn Tight','make',10,5,3),
+      H('Pure Six','make',6,6,6),  H('Ten Pressure','make',10,6,4),H('Through Clean','gate',null,6,6),
+      H('Zone Elite','goodzone',null,6,6),H('Six Flush','make',6,6,6),H('Long Money','make',10,6,4),
+      H('Clutch Zone','goodzone',null,6,5),H('Card Saver','make',6,6,6),H('Champion','make',10,6,5)
+    ]
+  }
+};
+const MEDAL = {
+  gold:  { lbl:'Gold',   star:'★★★', col:'#F4D03F' },
+  silver:{ lbl:'Silver', star:'★★',  col:'#C8D2CC' },
+  bronze:{ lbl:'Bronze', star:'★',   col:'#C98A4B' }
+};
+function medalFor(toPar){ if(toPar<=-3)return'gold'; if(toPar<=1)return'silver'; if(toPar<=7)return'bronze'; return null; }
+function toParStr(t){ return t<0 ? '−'+Math.abs(t) : t===0 ? 'E' : '+'+t; }
+function holeTerm(s){ if(s<=-2)return['Eagle','good']; if(s===-1)return['Birdie','good']; if(s===0)return['Par','good']; if(s===1)return['Bogey','long']; if(s===2)return['Double','bad']; return['Triple+','bad']; }
+function taskLabel(h){
+  if(h.type==='make') return `Make ${h.par} of ${h.balls} from ${h.dist}ft`;
+  if(h.type==='goodzone') return `${h.par} of ${h.balls} into the good zone`;
+  return `${h.par} of ${h.balls} through the gate`;
+}
+
+/* ---------- mat positions: where to putt from, mapped to the real 10ft mat ---------- */
+const SETUP = {
+  make:{
+    3:{ from:'the 3FT mark', to:'the top hole', note:'Straight up the white centre line.' },
+    6:{ from:'the 6FT mark', to:'the top hole', note:'Straight up the white centre line.' },
+    10:{ from:'the far end (by the WELLPUTT logo)', to:'the top hole', note:'Full length of the mat — the 10ft putt.' }
+  },
+  goodzone:{ from:'the 6FT mark', to:'the good zone', note:'Roll it past the hole so it stops in the green zone behind it — never leave it short.' },
+  gate:{ from:'the 3FT mark', to:'the gate', note:'Start the ball dead on the white line, between the two alignment marks by the hole.' }
+};
+function setupFor(type,dist){
+  if(type==='make') return SETUP.make[dist]||SETUP.make[6];
+  return SETUP[type];
+}
+function setupLine(type,dist){ const s=setupFor(type,dist); return `From ${s.from} → ${s.to}`; }
+
+/* ============================================================
+   PROGRESSION — XP, levels, ranks, achievements
+   ============================================================ */
+function xpToReach(level){ let sum=0; for(let l=1;l<level;l++) sum += 100 + (l-1)*60; return sum; }
+function levelFromXP(xp){ let l=1; while(xp >= xpToReach(l+1)) l++; return l; }
+function levelInfo(){
+  const xp=Store.get().xp||0, level=levelFromXP(xp);
+  const base=xpToReach(level), next=xpToReach(level+1);
+  return { xp, level, into:xp-base, span:next-base, rank:rankFor(level) };
+}
+function rankFor(level){
+  const R=[[1,'Range Rookie'],[3,'Mat Regular'],[5,'Green Reader'],[7,'Putt Artist'],[10,'Lag Master'],[14,'Clutch Closer'],[18,'Tour Ready']];
+  let name=R[0][1]; for(const [lv,n] of R) if(level>=lv) name=n; return name;
+}
+function xpForDrill(drill){ return drill.putts.length*2 + countSuccess(drill)*3 + 10; }
+const MEDAL_XP={ gold:60, silver:30, bronze:15 };
+
+/* ----- stat helpers for achievements ----- */
+function longestGoodRun(){ let best=0; for(const d of allDrills()){ if(d.type!=='goodzone')continue; let r=0; for(const p of d.putts){ if(p==='good'){r++;best=Math.max(best,r);} else r=0; } } return best; }
+function maxPuttsInDay(){ const m={}; for(const s of Store.get().sessions){ const k=s.date.slice(0,10); m[k]=(m[k]||0)+s.drills.reduce((a,d)=>a+d.putts.length,0); } return Math.max(0,...Object.values(m)); }
+function bestTwentyOne(){ let b=0; for(const s of Store.get().sessions) if(s.routine) b=Math.max(b,s.score); return b; }
+function gatePerfect(){ for(const d of allDrills()){ if(d.type==='gate' && d.putts.length>=5 && d.putts.every(p=>p==='through')) return true; } return false; }
+function tenFtDrillMakes(){ let b=0; for(const d of allDrills()){ if(d.type==='make'&&d.distance===10) b=Math.max(b,d.putts.filter(p=>p==='make').length); } return b; }
+function coursesUnderPar(){ const cs=Store.get().courses||{}; return Object.values(cs).filter(c=>c.best!=null&&c.best<0).length; }
+function goldCount(){ const cs=Store.get().courses||{}; return Object.values(cs).filter(c=>c.medal==='gold').length; }
+function coursesPlayed(){ const cs=Store.get().courses||{}; return Object.values(cs).filter(c=>c.plays>0).length; }
+
+/* ----- achievement catalog ----- */
+const ACHIEVEMENTS=[
+  { id:'first_roll', icon:'🎯', name:'First Roll',   desc:'Log your very first session.',           check:()=>totals().sessions>=1 },
+  { id:'century',    icon:'💯', name:'Century',       desc:'Log 100 putts.',        prog:()=>[totals().putts,100],  check:()=>totals().putts>=100 },
+  { id:'four_fig',   icon:'🏔️', name:'Four Figures',  desc:'Log 1,000 putts.',      prog:()=>[totals().putts,1000], check:()=>totals().putts>=1000 },
+  { id:'streak7',    icon:'🔥', name:'Habit',         desc:'Reach a 7-day streak.', prog:()=>[totals().streak,7],   check:()=>totals().streak>=7 },
+  { id:'streak30',   icon:'⚡', name:'Locked In',     desc:'Reach a 30-day streak.',prog:()=>[totals().streak,30],  check:()=>totals().streak>=30 },
+  { id:'on_fire',    icon:'🎇', name:'On Fire',       desc:'Make 10 in a row from 6ft.', prog:()=>[bestRunMake(6),10], check:()=>bestRunMake(6)>=10 },
+  { id:'pure_start', icon:'🎼', name:'Pure Start',    desc:'A perfect Start Line drill (5+ balls, all through).', check:gatePerfect },
+  { id:'zone_in',    icon:'🟢', name:'Zone Master',   desc:'10 good-zone putts in a row.', prog:()=>[longestGoodRun(),10], check:()=>longestGoodRun()>=10 },
+  { id:'long_tom',   icon:'🗼', name:'Long Tom',      desc:'Make 5 from 10ft in one drill.', prog:()=>[tenFtDrillMakes(),5], check:()=>tenFtDrillMakes()>=5 },
+  { id:'grinder',    icon:'⛏️', name:'Grinder',       desc:'Hit 50+ putts in one day.', prog:()=>[maxPuttsInDay(),50], check:()=>maxPuttsInDay()>=50 },
+  { id:'the21club',  icon:'🎪', name:'The 21 Club',   desc:'Score 18+ on The 21.', prog:()=>[bestTwentyOne(),18], check:()=>bestTwentyOne()>=18 },
+  { id:'red_num',    icon:'🔴', name:'Red Numbers',   desc:'Finish any course under par.',  check:()=>coursesUnderPar()>=1 },
+  { id:'gold_any',   icon:'🥇', name:'Gold Standard', desc:'Earn Gold on any course.',      check:()=>goldCount()>=1 },
+  { id:'triple',     icon:'👑', name:'Triple Crown',  desc:'Earn Gold on all three courses.', prog:()=>[goldCount(),3], check:()=>goldCount()>=3 },
+  { id:'card_done',  icon:'🗂️', name:'Card Complete', desc:'Play all three courses.', prog:()=>[coursesPlayed(),3], check:()=>coursesPlayed()>=3 },
+  { id:'lvl5',       icon:'⭐', name:'Rising',        desc:'Reach Level 5.', prog:()=>[levelInfo().level,5], check:()=>levelInfo().level>=5 },
+  { id:'lvl10',      icon:'🌟', name:'Double Digits', desc:'Reach Level 10.', prog:()=>[levelInfo().level,10], check:()=>levelInfo().level>=10 }
+];
+function evaluateAchievements(){
+  const have=Store.get().achievements||{};
+  const fresh=[];
+  for(const a of ACHIEVEMENTS){ if(!have[a.id] && a.check()){ if(Store.unlockAchievement(a.id)) fresh.push(a); } }
+  return fresh;
+}
+/* grant XP then check unlocks; returns what to celebrate */
+function grantRewards(xpEarned){
+  const before=levelFromXP(Store.get().xp||0);
+  Store.addXP(xpEarned);
+  const after=levelFromXP(Store.get().xp);
+  const newAch=evaluateAchievements();
+  return { xpEarned, leveledTo: after>before?after:null, newAch };
+}
+
+
+/* ---------- util ---------- */
+const $ = s => document.querySelector(s);
+const pct = (n,d) => d? Math.round(n/d*100):0;
+const todayKey = (dt=new Date()) => dt.toISOString().slice(0,10);
+function fmtDay(key){
+  const d=new Date(key+'T12:00:00'); const t=todayKey();
+  const y=todayKey(new Date(Date.now()-864e5));
+  if(key===t) return 'Today';
+  if(key===y) return 'Yesterday';
+  return d.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+}
+function toast(msg){
+  const el=$('#toast'); el.textContent=msg; el.classList.add('show');
+  clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),1700);
+}
+function buzz(ms=12){ if(navigator.vibrate) try{navigator.vibrate(ms)}catch(e){} }
+
+/* ---------- stats engine ---------- */
+function allDrills(){ return Store.get().sessions.flatMap(s=>s.drills.map(d=>({...d,date:s.date}))); }
+function computeStreak(){
+  const days=[...new Set(Store.get().sessions.map(s=>s.date.slice(0,10)))].sort().reverse();
+  if(!days.length) return 0;
+  let streak=0; let cur=new Date(todayKey()+'T12:00:00');
+  // allow streak to count if last session was today or yesterday
+  const last=new Date(days[0]+'T12:00:00');
+  const gap=Math.round((cur-last)/864e5);
+  if(gap>1) return 0;
+  cur=last;
+  for(const day of days){
+    const dd=new Date(day+'T12:00:00');
+    if(Math.round((cur-dd)/864e5)<=0 && day===todayKey(cur)){ streak++; cur=new Date(cur-864e5); }
+    else break;
+  }
+  return streak;
+}
+function makeByDistance(){
+  const out={};
+  for(const ft of DIST){ out[ft]={made:0,tot:0}; }
+  for(const d of allDrills()){
+    if(d.type!=='make') continue;
+    const o=out[d.distance]; if(!o) continue;
+    o.tot+=d.putts.length;
+    o.made+=d.putts.filter(p=>p==='make').length;
+  }
+  return out;
+}
+function goodZoneBias(){
+  let s=0,g=0,l=0;
+  for(const d of allDrills()){
+    if(d.type!=='goodzone') continue;
+    for(const p of d.putts){ if(p==='short')s++; else if(p==='good')g++; else l++; }
+  }
+  return {s,g,l,tot:s+g+l};
+}
+function startLineRate(){
+  let through=0,tot=0;
+  for(const d of allDrills()){
+    if(d.type!=='gate') continue;
+    tot+=d.putts.length; through+=d.putts.filter(p=>p==='through').length;
+  }
+  return {through,tot};
+}
+function totals(){
+  const ds=allDrills();
+  const putts=ds.reduce((a,d)=>a+d.putts.length,0);
+  return { sessions:Store.get().sessions.length, putts, streak:computeStreak() };
+}
+function bestRunMake(distance){
+  let best=0;
+  for(const d of allDrills()){
+    if(d.type!=='make'||(distance&&d.distance!==distance)) continue;
+    let run=0; for(const p of d.putts){ if(p==='make'){run++;best=Math.max(best,run);} else run=0; }
+  }
+  return best;
+}
+// overall make% per recent session (for sparkline) — uses make drills only
+function recentMakeSeries(limit=12){
+  const arr=[];
+  for(const s of Store.get().sessions){
+    let made=0,tot=0;
+    for(const d of s.drills){ if(d.type==='make'){ tot+=d.putts.length; made+=d.putts.filter(p=>p==='make').length; } }
+    if(tot) arr.push(pct(made,tot));
+  }
+  return arr.slice(0,limit).reverse();
+}
+
+/* ============================================================
+   ROUTER / SCREENS
+   ============================================================ */
+let view='practice';
+const nav=$('#nav'), screen=$('#screen');
+
+function renderNav(){
+  const tabs=[
+    ['practice','Practice','M4 19V9l8-5 8 5v10M9 19v-6h6v6'],
+    ['rewards','Rewards','M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4zM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3'],
+    ['stats','Stats','M4 19V5M4 19h16M9 16V9M14 16V6M19 16v-4'],
+    ['history','History','M12 8v4l3 2M4 12a8 8 0 1 0 8-8 8 8 0 0 0-7 4M4 5v4h4']
+  ];
+  nav.innerHTML=`<div class="nav-inner">${tabs.map(([id,l,p])=>`
+    <button class="${view===id?'on':''}" data-tab="${id}">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="${p}"/></svg>${l}
+    </button>`).join('')}</div>`;
+  nav.querySelectorAll('button').forEach(b=>b.onclick=()=>{ view=b.dataset.tab; render(); buzz(8); });
+}
+
+function render(){
+  renderNav();
+  if(view==='practice') renderPractice();
+  else if(view==='rewards') renderRewards();
+  else if(view==='stats') renderStats();
+  else renderHistory();
+  screen.scrollTop=0;
+}
+
+/* ---------- PRACTICE ---------- */
+function renderPractice(){
+  const t=totals();
+  const li=levelInfo();
+  const md=makeByDistance();
+  const overall = (()=>{ let m=0,x=0; for(const ft of DIST){m+=md[ft].made;x+=md[ft].tot;} return x?pct(m,x):null; })();
+  const gz=goodZoneBias(); const sl=startLineRate();
+
+  const cardStat = (id)=>{
+    if(id==='make') return overall!=null?`<b>${overall}%</b> make rate · all distances`:`No reps yet`;
+    if(id==='goodzone') return gz.tot?`<b>${pct(gz.g,gz.tot)}%</b> in the good zone`:`No reps yet`;
+    if(id==='gate') return sl.tot?`<b>${pct(sl.through,sl.tot)}%</b> on line`:`No reps yet`;
+  };
+
+  screen.innerHTML=`
+    <div class="top">
+      <div class="brand">
+        <span class="mark">${laneMarkSVG()}</span>
+        <div class="brandtext">
+          <h1>Lane<b>IQ</b></h1>
+        </div>
+      </div>
+      <div class="hstats">
+        <button class="lvchip" data-tab="rewards">
+          <span class="lv">Lv ${li.level}</span>
+          <span class="lvbar"><i style="width:${Math.round(li.into/li.span*100)}%"></i></span>
+        </button>
+        <div class="streak">
+          <span class="flame">${t.streak>0?'🔥':'·'}</span>
+          <span class="n">${t.streak}</span><span class="lbl">day${t.streak===1?'':'s'}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card matguide" data-guide="1">
+      <div class="ct">
+        <div>
+          <h3>Mat guide</h3>
+          <p>Where to stand and aim for every drill, mapped to your mat's marks.</p>
+        </div>
+        <div class="mg-thumb">${matThumbSVG()}</div>
+      </div>
+    </div>
+
+    <div class="sect-label">Daily routine</div>
+    <div class="card feature" data-drill="routine">
+      <div class="ct">
+        <div>
+          <h3>The 21</h3>
+          <p>7 start-line · 7 makes from 6ft · 7 good-zone. One pass, one number.</p>
+        </div>
+        <span class="pill acc">▶ Start</span>
+      </div>
+      <div class="stat">${(()=>{const r=lastRoutine();return r?`Last: <b style="margin-left:2px">${r.score}/21</b> &nbsp;·&nbsp; ${fmtDay(r.date.slice(0,10))}`:'Your warm-up before every range trip'})()}</div>
+    </div>
+
+    <div class="sect-label">Courses · 18 holes</div>
+    <div class="grid">
+      ${Object.keys(COURSES).map(id=>{ const c=COURSES[id]; const p=(Store.get().courses||{})[id]; return `
+        <div class="card course" data-course="${id}">
+          <div class="ct">
+            <div>
+              <h3>${c.name}</h3>
+              <p>${c.blurb}</p>
+            </div>
+            ${p&&p.medal
+              ? `<span class="medal" style="--mc:${MEDAL[p.medal].col}">${MEDAL[p.medal].star}</span>`
+              : `<span class="pill ${c.tag}">${c.level}</span>`}
+          </div>
+          <div class="stat">${p
+            ? `Best <b>${toParStr(p.best)}</b> &nbsp;·&nbsp; ${p.plays} play${p.plays>1?'s':''}`
+            : `18 holes &nbsp;·&nbsp; ${c.level.toLowerCase()}`}</div>
+        </div>`; }).join('')}
+    </div>
+
+    <div class="sect-label">Single drills</div>
+    <div class="grid">
+      ${['make','goodzone','gate'].map(id=>{const d=DRILLS[id];return `
+        <div class="card" data-drill="${id}">
+          <div class="ct">
+            <div>
+              <h3>${d.name}</h3>
+              <p>${d.desc}</p>
+            </div>
+            <div class="glyph"><i style="top:${id==='goodzone'?'10px':id==='gate'?'8px':'26px'}"></i></div>
+          </div>
+          <div class="stat"><span class="pill ${d.tag}">${d.tagLabel}</span> ${cardStat(id)}</div>
+        </div>`}).join('')}
+    </div>
+    <div class="footnote">GolfIQ suite · WellPutt 10ft</div>
+  `;
+  screen.querySelectorAll('[data-drill]').forEach(c=>c.onclick=()=>{ buzz(); openSetup(c.dataset.drill); });
+  screen.querySelectorAll('[data-course]').forEach(c=>c.onclick=()=>{ buzz(); openCourse(c.dataset.course); });
+  const mg=screen.querySelector('[data-guide]'); if(mg) mg.onclick=()=>{ buzz(); openMatGuide(); };
+  const lc=screen.querySelector('.lvchip'); if(lc) lc.onclick=()=>{ buzz(8); view='rewards'; render(); };
+}
+function lastRoutine(){ return Store.get().sessions.find(s=>s.routine); }
+
+/* ---------- REWARDS (level + achievements) ---------- */
+function renderRewards(){
+  const li=levelInfo();
+  const have=Store.get().achievements||{};
+  const unlocked=ACHIEVEMENTS.filter(a=>have[a.id]).length;
+  const pctInto=Math.round(li.into/li.span*100);
+  screen.innerHTML=header('Rewards','Level up your putting')+`
+    <div class="levelcard">
+      <div class="lc-ring"><div class="lc-lv">${li.level}</div></div>
+      <div class="lc-body">
+        <div class="lc-rank">${li.rank}</div>
+        <div class="lc-xp">${li.into} / ${li.span} XP to Lv ${li.level+1}</div>
+        <div class="lc-track"><i style="width:${pctInto}%"></i></div>
+        <div class="lc-total">${li.xp.toLocaleString()} XP total</div>
+      </div>
+    </div>
+
+    <div class="sect-label" style="display:flex;justify-content:space-between"><span>Achievements</span><span style="color:var(--muted)">${unlocked}/${ACHIEVEMENTS.length}</span></div>
+    <div class="ach-grid">
+      ${ACHIEVEMENTS.map(a=>{
+        const on=!!have[a.id];
+        let prog='';
+        if(!on && a.prog){ const [c,tgt]=a.prog(); prog=`<div class="ach-bar"><i style="width:${Math.min(100,Math.round(c/tgt*100))}%"></i></div><div class="ach-p">${Math.min(c,tgt)}/${tgt}</div>`; }
+        return `<div class="ach ${on?'on':'off'}">
+          <div class="ach-ic">${a.icon}</div>
+          <div class="ach-n">${a.name}</div>
+          <div class="ach-d">${a.desc}</div>
+          ${on?`<div class="ach-done">✓ Unlocked</div>`:prog}
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="footnote">earn XP every rep · badges unlock as you improve</div>
+  `;
+}
+
+/* ---------- brand mark (LaneIQ logo — GolfIQ palette) ---------- */
+function laneMarkSVG(){
+  return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <rect x="35" y="14" width="30" height="72" rx="15" fill="none" stroke="#46C98A" stroke-width="6"/>
+    <rect x="38" y="40" width="24" height="15" rx="7.5" fill="#46C98A" opacity=".28"/>
+    <path d="M50 30 V70" stroke="#F2EBDA" stroke-opacity=".5" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="1.5 6"/>
+    <circle cx="50" cy="27" r="8" fill="#0A201A" stroke="#F4D03F" stroke-width="4.5"/>
+    <circle cx="50" cy="74" r="5" fill="#F2EBDA"/>
+  </svg>`;
+}
+
+/* ---------- MAT GUIDE ---------- */
+function matThumbSVG(){
+  return `<svg viewBox="0 0 34 54" xmlns="http://www.w3.org/2000/svg">
+    <rect x="7" y="2" width="20" height="50" rx="4" fill="#0E2A22" stroke="#26483D"/>
+    <rect x="7" y="4" width="20" height="9" fill="rgba(70,201,138,.16)"/>
+    <line x1="17" y1="6" x2="17" y2="50" stroke="#9DB3A6" stroke-opacity=".3" stroke-dasharray="1.5 3"/>
+    <circle cx="17" cy="14" r="2.4" fill="#0A201A" stroke="#F4D03F" stroke-width="1.4"/>
+    <circle cx="17" cy="26" r="1.6" fill="#46C98A"/><circle cx="17" cy="36" r="1.6" fill="#E0A13B"/><circle cx="17" cy="47" r="1.6" fill="#7FC8FF"/>
+  </svg>`;
+}
+function matGuideSVG(){
+  const W=230,H=540, lx=54,lw=122, cx=W/2, top=18, bot=H-18;
+  const hole=88, gzTop=26, gzBot=hole-12;
+  const spots=[ {y:196,lab:'3FT',c:'#46C98A',t:'Make · Gate start'}, {y:300,lab:'6FT',c:'#E0A13B',t:'Make · Good zone start'}, {y:470,lab:'10ft',c:'#7FC8FF',t:'Long make · far end'} ];
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="max-height:52vh">
+    <rect x="${lx}" y="${top}" width="${lw}" height="${bot-top}" rx="16" fill="#0E2A22" stroke="#26483D"/>
+    <rect x="${lx}" y="${gzTop}" width="${lw}" height="${gzBot-gzTop}" fill="rgba(70,201,138,.14)"/>
+    <text x="${cx}" y="${(gzTop+gzBot)/2+3}" text-anchor="middle" fill="#46C98A" font-family="ui-monospace,monospace" font-size="9" opacity=".8" letter-spacing="2">GOOD ZONE</text>
+    <line x1="${cx}" y1="${top+6}" x2="${cx}" y2="${bot-6}" stroke="#9DB3A6" stroke-opacity=".3" stroke-dasharray="2 7"/>
+    <circle cx="${cx}" cy="${hole}" r="8" fill="#0A201A" stroke="#F4D03F" stroke-width="2.4"/>
+    <text x="${cx}" y="${hole+24}" text-anchor="middle" fill="#F2EBDA" font-family="ui-monospace,monospace" font-size="10" letter-spacing="2">HOLE</text>
+    <path d="M ${lx-16} ${bot-40} L ${lx-16} ${hole+28}" stroke="#6E8F7E" stroke-width="1.5" marker-end="url(#ar)"/>
+    <defs><marker id="ar" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M1 1 L6 4 L1 7" fill="none" stroke="#6E8F7E" stroke-width="1.3"/></marker></defs>
+    <text x="${lx-22}" y="${(bot+hole)/2}" text-anchor="middle" fill="#6E8F7E" font-family="ui-monospace,monospace" font-size="9" letter-spacing="2" transform="rotate(-90 ${lx-22} ${(bot+hole)/2})">PUTT THIS WAY</text>
+    ${spots.map(s=>`
+      <circle cx="${cx}" cy="${s.y}" r="6" fill="${s.c}"/>
+      <line x1="${lx}" y1="${s.y}" x2="${lx+lw}" y2="${s.y}" stroke="${s.c}" stroke-opacity=".35" stroke-dasharray="3 4"/>
+      <text x="${lx+lw+8}" y="${s.y+4}" fill="${s.c}" font-family="ui-monospace,monospace" font-size="12" font-weight="600">${s.lab}</text>
+    `).join('')}
+    <text x="${cx}" y="${bot-4}" text-anchor="middle" fill="#6E8F7E" font-family="ui-monospace,monospace" font-size="8" letter-spacing="3">WELLPUTT · 10FT</text>
+  </svg>`;
+}
+function openMatGuide(){
+  const rows=[
+    ['make',3],['make',6],['make',10],['goodzone',null],['gate',null]
+  ].map(([type,dist])=>{
+    const s=setupFor(type,dist);
+    const name = type==='make'?`Make · ${dist}ft` : type==='goodzone'?'Good Zone' : 'Start Line';
+    return `<div class="mg-row">
+      <div class="mg-name">${name}</div>
+      <div class="mg-instr"><b>From ${s.from} → ${s.to}.</b> ${s.note}</div>
+    </div>`;
+  }).join('');
+  ovRoot.innerHTML=`<div class="overlay">
+    <div class="ov-top">
+      <div><div class="name">Mat guide</div><div class="sub">Your WellPutt 10ft · where to putt from</div></div>
+      <button class="iconbtn" id="close">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:4px 18px 18px;-webkit-overflow-scrolling:touch">
+      <div style="display:grid;place-items:center;padding:6px 0 2px">${matGuideSVG()}</div>
+      <p style="color:var(--muted);font-size:13px;margin:6px 2px 14px;text-align:center">Two directions on one mat: putt <b style="color:var(--ink)">up to the hole</b> for accuracy, and <b style="color:var(--ink)">past it into the green zone</b> for distance control.</p>
+      ${rows}
+    </div>
+  </div>`;
+  $('#close').onclick=closeOverlay;
+}
+
+
+/* ---------- STATS ---------- */
+function renderStats(){
+  const t=totals();
+  if(!t.putts){ screen.innerHTML=header('Stats','Telemetry from every rep')+emptyState('📈','No data yet','Log a drill and your make rates, bias and trends show up here.'); wireStatsEmpty(); return; }
+  const md=makeByDistance(); const gz=goodZoneBias(); const sl=startLineRate();
+  const series=recentMakeSeries();
+
+  screen.innerHTML=header('Stats','Telemetry from every rep')+`
+    <div class="kpis">
+      <div class="kpi"><div class="v">${t.putts}</div><div class="k">putts logged</div></div>
+      <div class="kpi"><div class="v">${t.sessions}</div><div class="k">sessions</div></div>
+      <div class="kpi"><div class="v">${t.streak}<small> d</small></div><div class="k">streak</div></div>
+    </div>
+
+    <div class="panel">
+      <h4>Make rate by distance</h4>
+      <p class="hint">Accuracy direction · holed out from the set marks</p>
+      ${DIST.map(ft=>{const o=md[ft];const p=pct(o.made,o.tot);return `
+        <div class="distrow">
+          <span class="lab">${ft}ft</span>
+          <div class="bar"><i style="width:${o.tot?p:0}%"></i></div>
+          <span class="pct">${o.tot?`<b>${p}%</b>`:'—'} </span>
+        </div>`}).join('')}
+      <div class="biaslab" style="margin-top:12px"><span>best run @6ft</span><span>${bestRunMake(6)} in a row</span></div>
+    </div>
+
+    <div class="panel">
+      <h4>Distance control bias</h4>
+      <p class="hint">Where your lag putts finish. Aim to live in the green.</p>
+      ${gz.tot?`
+        <div class="bias">
+          <div class="s" style="flex:${gz.s||0.001}">${gz.s?pct(gz.s,gz.tot)+'%':''}</div>
+          <div class="g" style="flex:${gz.g||0.001}">${gz.g?pct(gz.g,gz.tot)+'%':''}</div>
+          <div class="l" style="flex:${gz.l||0.001}">${gz.l?pct(gz.l,gz.tot)+'%':''}</div>
+        </div>
+        <div class="biaslab"><span>◀ short</span><span>good zone</span><span>long ▶</span></div>`
+        :`<p class="hint" style="margin:0">No good-zone reps yet.</p>`}
+    </div>
+
+    <div class="panel">
+      <h4>Start line</h4>
+      <p class="hint">Putts started through the gate</p>
+      <div class="distrow" style="margin:4px 0 0">
+        <span class="lab">gate</span>
+        <div class="bar"><i style="width:${sl.tot?pct(sl.through,sl.tot):0}%"></i></div>
+        <span class="pct">${sl.tot?`<b>${pct(sl.through,sl.tot)}%</b>`:'—'}</span>
+      </div>
+    </div>
+
+    ${series.length>1?`<div class="panel"><h4>Make-rate trend</h4><p class="hint">Recent sessions, oldest → newest</p>${sparkline(series)}</div>`:''}
+
+    ${coursesPanel()}
+
+    <button class="danger" id="wipe">Reset all data</button>
+  `;
+  wireStatsEmpty();
+}
+function coursesPanel(){
+  const cs=Store.get().courses||{};
+  const rows=Object.keys(COURSES).map(id=>{ const c=COURSES[id]; const p=cs[id]; return `
+    <div class="distrow">
+      <span class="lab" style="width:auto;flex:1;font-family:var(--body);font-weight:600;font-size:14px">${c.name}</span>
+      <span class="medal" style="--mc:${p&&p.medal?MEDAL[p.medal].col:'var(--muted-2)'};margin-right:4px">${p&&p.medal?MEDAL[p.medal].star:'·'}</span>
+      <span class="pct">${p?`<b>${toParStr(p.best)}</b>`:'—'}</span>
+    </div>`; }).join('');
+  return `<div class="panel"><h4>Courses</h4><p class="hint">Best to-par on each 18-hole card</p>${rows}</div>`;
+}
+function wireStatsEmpty(){ const w=$('#wipe'); if(w) w.onclick=()=>{ if(confirm('Delete all sessions and stats? This cannot be undone.')){ Store.wipe(); toast('Data reset'); render(); } }; }
+
+function sparkline(vals){
+  const W=300,H=70,pad=6; const max=Math.max(100,...vals),min=Math.min(...vals,0);
+  const x=i=>pad+i*(W-2*pad)/(vals.length-1);
+  const y=v=>H-pad-((v-min)/((max-min)||1))*(H-2*pad);
+  const d=vals.map((v,i)=>`${i?'L':'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
+  const area=`${d} L${x(vals.length-1).toFixed(1)} ${H-pad} L${pad} ${H-pad} Z`;
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="none">
+    <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#46C98A" stop-opacity=".28"/><stop offset="1" stop-color="#46C98A" stop-opacity="0"/>
+    </linearGradient></defs>
+    <path d="${area}" fill="url(#sg)"/>
+    <path d="${d}" fill="none" stroke="#46C98A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    ${vals.map((v,i)=>`<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="${i===vals.length-1?3.2:2}" fill="#46C98A"/>`).join('')}
+  </svg>`;
+}
+
+/* ---------- HISTORY ---------- */
+function renderHistory(){
+  const sessions=Store.get().sessions;
+  if(!sessions.length){ screen.innerHTML=header('History','Every session, kept')+emptyState('🗂️','Nothing logged yet','Finish a drill and it lands here, grouped by day.'); return; }
+  const groups={};
+  for(const s of sessions){ const k=s.date.slice(0,10); (groups[k]=groups[k]||[]).push(s); }
+  const days=Object.keys(groups).sort().reverse();
+  screen.innerHTML=header('History','Every session, kept')+days.map(k=>{
+    const list=groups[k]; const putts=list.reduce((a,s)=>a+s.drills.reduce((b,d)=>b+d.putts.length,0),0);
+    return `<div class="daygroup">
+      <div class="dh"><span class="d">${fmtDay(k)}</span><span class="c">${putts} putts · ${list.length} session${list.length>1?'s':''}</span></div>
+      ${list.map(sessionRow).join('')}
+    </div>`;
+  }).join('');
+  screen.querySelectorAll('[data-replay]').forEach(r=>r.onclick=()=>{ buzz(); openCourse(r.dataset.replay); });
+}
+function sessionRow(s){
+  if(s.course){
+    const m=s.medal?MEDAL[s.medal]:null;
+    const col=s.toPar<0?'var(--green)':s.toPar>0?'var(--amber)':'var(--ink)';
+    return `<div class="hrow" data-replay="${s.courseId}"><div class="l"><span class="t">${s.courseName} ${m?`<span class="medal" style="--mc:${m.col};font-size:12px">${m.star}</span>`:''}</span>
+      <span class="s">${time(s.date)} · 18 holes</span></div>
+      <div class="score" style="color:${col}">${toParStr(s.toPar)}</div></div>`;
+  }
+  if(s.routine){
+    return `<div class="hrow"><div class="l"><span class="t">The 21</span>
+      <span class="s">${s.drills.map(d=>labelFor(d)).join(' · ')}</span></div>
+      <div class="score">${s.score}<small>/21</small></div></div>`;
+  }
+  const d=s.drills[0]; const def=DRILLS[d.type];
+  const succ=d.putts.filter(p=>def.outcomes.find(o=>o.key===p&&o.success)).length;
+  const name=def.name+(d.type==='make'?` · ${d.distance}ft`:'');
+  return `<div class="hrow"><div class="l"><span class="t">${name}</span>
+    <span class="s">${time(s.date)} · ${d.putts.length} putts</span></div>
+    <div class="score">${succ}<small>/${d.putts.length}</small></div></div>`;
+}
+function labelFor(d){ const n=DRILLS[d.type].name.split(' ')[0]; const s=d.putts.filter(p=>DRILLS[d.type].outcomes.find(o=>o.key===p&&o.success)).length; return `${n} ${s}/${d.putts.length}`; }
+function time(iso){ return new Date(iso).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); }
+
+function header(title,sub){
+  return `<div class="top"><div class="brand"><div class="brandtext"><span class="eyebrow">${sub}</span><h1>${title}</h1></div></div></div>`;
+}
+function emptyState(ic,h,p){ return `<div class="empty"><div class="ic">${ic}</div><h4>${h}</h4><p>${p}</p></div>`; }
+
+/* ============================================================
+   SETUP + ACTIVE DRILL (overlay)
+   ============================================================ */
+const ovRoot=$('#overlay-root');
+let setupState=null;
+
+function openSetup(which){
+  if(which==='routine'){ startRoutine(); return; }
+  const def=DRILLS[which];
+  setupState={ type:which, distance:6, balls:Store.get().settings.balls };
+  renderSetup(def);
+}
+function setupCalloutHTML(type,dist){
+  const s=setupFor(type,dist);
+  return `<div class="sc-pin">📍</div><div><div class="sc-line">From <b>${s.from}</b> → <b>${s.to}</b></div><div class="sc-note">${s.note}</div></div>`;
+}
+function renderSetup(def){
+  ovRoot.innerHTML=`<div class="overlay">
+    <div class="ov-top">
+      <div><div class="name">${def.name}</div><div class="sub">${def.tagLabel} · set up your reps</div></div>
+      <button class="iconbtn" id="close">✕</button>
+    </div>
+    <div style="padding:18px;flex:1;overflow-y:auto">
+      <p style="color:var(--muted);font-size:14px;margin:0 0 6px">${def.desc}</p>
+      ${def.needsDistance?`
+        <div class="sheet-label">Distance off the mat</div>
+        <div class="seg" id="seg">${DIST.map(ft=>`<button data-d="${ft}" class="${setupState.distance===ft?'on':''}">${ft}<span class="u">FEET</span></button>`).join('')}</div>
+      `:''}
+      <div class="setup-callout" id="callout">${setupCalloutHTML(setupState.type, setupState.distance)}</div>
+      <div class="sheet-label">How many balls?</div>
+      <div class="ballrow" id="balls">${[5,10,15,20].map(n=>`<button data-n="${n}" class="${setupState.balls===n?'on':''}">${n}</button>`).join('')}</div>
+    </div>
+    <div class="controls"><button class="finish" id="go">Start ${def.name} →</button></div>
+  </div>`;
+  $('#close').onclick=closeOverlay;
+  const seg=$('#seg'); if(seg) seg.querySelectorAll('button').forEach(b=>b.onclick=()=>{ setupState.distance=+b.dataset.d; renderSetup(def); });
+  $('#balls').querySelectorAll('button').forEach(b=>b.onclick=()=>{ setupState.balls=+b.dataset.n; Store.setBalls(setupState.balls); renderSetup(def); });
+  $('#go').onclick=()=>{ buzz(); startDrill(setupState.type, setupState.balls, setupState.distance, null); };
+}
+
+/* ----- active drill runner ----- */
+let run=null; // {type,balls,distance,putts:[],queue:null,course?,hole?,holeNo?}
+let activeCourse=null;
+function startDrill(type,balls,distance,queue,ctx){
+  run={ type, balls, distance, putts:[], queue, ts:Date.now() };
+  if(ctx){ run.course=ctx.course; run.hole=ctx.hole; run.holeNo=ctx.holeNo; }
+  renderRun();
+}
+function renderRun(){
+  const def=DRILLS[run.type];
+  const done=run.putts.length, total=run.balls;
+  const succKeys=def.outcomes.filter(o=>o.success).map(o=>o.key);
+  const succ=run.putts.filter(p=>succKeys.includes(p)).length;
+  const live=pct(succ,done);
+  const metaLabel = run.type==='goodzone'?'in zone' : run.type==='gate'?'on line':'made';
+  const isCourse = !!run.course;
+
+  const nameLine = isCourse ? run.hole.name : `${def.name}${run.type==='make'?` · ${run.distance}ft`:''}`;
+  const subLine  = isCourse
+    ? `Hole ${run.holeNo}/18 · ${taskLabel(run.hole)}`
+    : `${run.queue?run.queue.label+' · ':''}ball ${Math.min(done+1,total)} of ${total}`;
+  const madeWord  = run.type==='goodzone'?'in the zone' : run.type==='gate'?'on your line':'putts made';
+  const remaining = total-done;
+  const goalHTML = isCourse
+    ? `🎯 Sink ${run.hole.par} of ${total} to match par · ${run.hole.par+1}+ to go under`
+    : run.type==='make'    ? `🎯 Hole out from ${run.distance}ft — build your make streak`
+    : run.type==='goodzone'? `🎯 Finish past the hole, inside the good zone`
+    :                        `🎯 Start every ball through the gate, on line`;
+
+  let readoutHTML;
+  if(isCourse){
+    const running = run.course.toParSoFar||0;
+    const rcol = running<0?'var(--green)':running>0?'var(--amber)':'var(--ink)';
+    const hit = succ>=run.hole.par;
+    readoutHTML = `<div class="big" style="color:${done?(hit?'var(--green)':'var(--ink)'):'var(--ink)'}">${succ}<small>/${run.hole.par}</small></div>
+      <div class="meta"><span class="k">${metaLabel} · ${done} of ${total}</span>
+      <span class="v" style="color:${rcol}">${toParStr(running)}<small style="color:var(--muted-2);font-size:11px"> thru ${run.holeNo-1}</small></span></div>`;
+  } else {
+    readoutHTML = `<div class="big">${done?live:'0'}<small>%</small></div>
+      <div class="meta"><span class="k">${madeWord}</span><span class="v">${succ} of ${done||0}</span></div>`;
+  }
+
+  ovRoot.innerHTML=`<div class="overlay">
+    <div class="ov-top">
+      <div><div class="name">${nameLine}</div>
+        <div class="sub">${subLine}</div></div>
+      <button class="iconbtn" id="close">✕</button>
+    </div>
+    <div class="run-setup">📍 ${setupLine(run.type, run.distance)}</div>
+    <div class="readout">
+      ${readoutHTML}
+    </div>
+    <div class="goal">${goalHTML}</div>
+    <div class="lane-wrap">${laneSVG(run)}</div>
+    <div class="controls">
+      <div class="repcount">${remaining>0?`Putt <b>${done+1}</b> of ${total} · ${remaining} to go`:`All ${total} logged — ready to ${isCourse?'score the hole':'save'}`}</div>
+      <div class="runrow">
+        <div class="dots">${Array.from({length:total}).map((_,i)=>`<span class="dot" style="${i<done?dotStyle(run.putts[i]):''}"></span>`).join('')}</div>
+        <button class="undo" id="undo" ${done?'':'disabled'}>↶ undo</button>
+      </div>
+      ${remaining>0?`<div class="tap-hint">How did that putt finish?</div>`:''}
+      <div class="btn-row">
+        ${def.outcomes.map(o=>`<button class="obtn ${o.cls}" data-k="${o.key}">${o.label}${o.sub?`<span class="k">${o.sub}</span>`:''}</button>`).join('')}
+      </div>
+      ${done>=total?`<button class="finish" id="finish">${isCourse?'Score hole →':run.queue?'Next →':'Save session'}</button>`:''}
+    </div>
+  </div>`;
+  $('#close').onclick=()=>{ if(run.putts.length && !confirm('Quit this drill? Reps won’t be saved.')) return; closeOverlay(); };
+  $('#undo').onclick=()=>{ run.putts.pop(); buzz(8); renderRun(); };
+  ovRoot.querySelectorAll('.obtn').forEach(b=>b.onclick=()=>{
+    if(run.putts.length>=total) return;
+    run.putts.push(b.dataset.k); buzz();
+    if(run.putts.length>=total) buzz(40);
+    renderRun();
+  });
+  const f=$('#finish'); if(f) f.onclick=finishRun;
+}
+function dotStyle(key){
+  const map={make:'--green',good:'--green',through:'--green',miss:'--clay',short:'--clay',off:'--clay',long:'--amber'};
+  const c=map[key]||'--muted'; return `background:var(${c});border-color:var(${c})`;
+}
+
+/* ----- the lane visual: places a dot for each logged putt ----- */
+function laneSVG(run){
+  const W=200,H=430, lx=46, lw=108, top=24, bot=H-24;
+  const cx=W/2;
+  // colors
+  const C={make:'#46C98A',good:'#46C98A',through:'#46C98A',miss:'#E06A5C',short:'#E06A5C',off:'#E06A5C',long:'#E0A13B'};
+  // zone bands depend on drill
+  let bands='', holeY, gateY, marks='';
+  if(run.type==='goodzone'){
+    holeY=top+(bot-top)*0.62;
+    const gzTop=top+(bot-top)*0.18, gzBot=holeY;          // good zone = past hole
+    bands=`<rect x="${lx}" y="${gzTop}" width="${lw}" height="${gzBot-gzTop}" fill="rgba(70,201,138,.12)"/>
+           <rect x="${lx}" y="${top}" width="${lw}" height="${gzTop-top}" fill="rgba(224,161,59,.08)"/>
+           <line x1="${lx}" y1="${gzTop}" x2="${lx+lw}" y2="${gzTop}" stroke="#E0A13B" stroke-opacity=".4" stroke-dasharray="3 4"/>`;
+    marks=`<text x="${cx}" y="${(gzTop+holeY)/2+4}" text-anchor="middle" fill="#46C98A" font-family="ui-monospace,monospace" font-size="9" opacity=".6" letter-spacing="2">GOOD ZONE</text>`;
+  } else if(run.type==='gate'){
+    gateY=top+(bot-top)*0.30; holeY=top+(bot-top)*0.30;
+    bands=`<rect x="${cx-13}" y="${gateY-4}" width="3" height="8" rx="1.5" fill="#9DB3A6"/>
+           <rect x="${cx+10}" y="${gateY-4}" width="3" height="8" rx="1.5" fill="#9DB3A6"/>`;
+  } else { // make
+    holeY=top+(bot-top)*0.22;
+    bands=`<path d="M ${cx-26} ${holeY+6} A 26 26 0 0 1 ${cx+26} ${holeY+6}" fill="none" stroke="#46C98A" stroke-opacity=".5" stroke-width="2.5"/>`;
+    marks=`<text x="${cx}" y="${bot-6}" text-anchor="middle" fill="#6E8F7E" font-family="ui-monospace,monospace" font-size="9" letter-spacing="2">${run.distance}FT</text>`;
+  }
+  // dots placement
+  let dots='';
+  run.putts.forEach((p,i)=>{
+    let x=cx+((hash(i)%30)-15), y;
+    if(run.type==='goodzone'){
+      if(p==='short') y= holeY + 14 + (hash(i*7)%((bot-holeY)-20));
+      else if(p==='good') y= top+(bot-top)*0.20 + (hash(i*7)% (holeY-(top+(bot-top)*0.20)-8));
+      else y= top+6 + (hash(i*7)%((top+(bot-top)*0.16)-top));
+    } else if(run.type==='gate'){
+      if(p==='through'){ x=cx+((hash(i)%8)-4); y=gateY; }
+      else { x=cx+(hash(i)%2? 1:-1)*(22+hash(i*3)%14); y=gateY+((hash(i*5)%20)-10); }
+    } else {
+      if(p==='make'){ x=cx+((hash(i)%10)-5); y=holeY; }
+      else { x=cx+(hash(i)%2?1:-1)*(14+hash(i*3)%20); y=holeY + (hash(i*5)%70); }
+    }
+    const c=C[p]||'#9DB3A6';
+    dots+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="${c}" fill-opacity=".9" stroke="#0A201A" stroke-width="1"/>`;
+  });
+  // dashed centerline
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+    <rect x="${lx}" y="${top}" width="${lw}" height="${bot-top}" rx="14" fill="#0E2A22" stroke="#26483D"/>
+    ${bands}
+    <line x1="${cx}" y1="${top+6}" x2="${cx}" y2="${bot-6}" stroke="#9DB3A6" stroke-opacity=".28" stroke-dasharray="2 7" stroke-width="1.5"/>
+    <circle cx="${cx}" cy="${holeY}" r="7" fill="#0A201A" stroke="#F4D03F" stroke-width="2"/>
+    ${marks}
+    ${dots}
+  </svg>`;
+}
+function hash(n){ n=(n<<13)^n; return ((n*(n*n*15731+789221)+1376312589)&0x7fffffff)%100; }
+
+/* ----- finishing a run / routine queue ----- */
+function finishRun(){
+  const drill={ type:run.type, distance:run.distance, putts:run.putts.slice() };
+  if(run.course){ scoreHole(drill); return; }
+  if(run.queue){
+    run.queue.collected.push(drill);
+    const q=run.queue;
+    if(q.steps.length){
+      const next=q.steps.shift();
+      startDrill(next.type, next.balls, next.distance, { ...q, label:next.label });
+    } else {
+      // routine complete
+      const score=q.collected.reduce((a,d)=>a+countSuccess(d),0);
+      Store.addSession({ id:Date.now(), date:new Date().toISOString(), routine:true, score, drills:q.collected });
+      const xp=q.collected.reduce((a,d)=>a+xpForDrill(d),0)+15;
+      const r=grantRewards(xp);
+      buzz(60); celebrate(r, `The 21 · ${score}/21`);
+    }
+  } else {
+    Store.addSession({ id:Date.now(), date:new Date().toISOString(), drills:[drill] });
+    const s=countSuccess(drill);
+    const r=grantRewards(xpForDrill(drill));
+    buzz(60); celebrate(r, `${DRILLS[drill.type].name} · ${s}/${drill.putts.length}`);
+  }
+}
+/* show a rewards overlay if there's something to celebrate, else a quick toast; then return to practice */
+function celebrate(r, headline){
+  view='practice';
+  if(r.leveledTo || r.newAch.length){ renderRewardPopup(r, headline); }
+  else { closeOverlay(); render(); toast(`${headline} · +${r.xpEarned} XP`); }
+}
+function renderRewardPopup(r, headline){
+  const li=levelInfo();
+  ovRoot.innerHTML=`<div class="overlay"><div class="result" style="justify-content:center;gap:0">
+    ${r.leveledTo?`<div class="reward-lvl">LEVEL UP</div><div class="term" style="color:var(--green);font-size:52px">Lv ${r.leveledTo}</div><div class="hs">${li.rank}</div>`:`<div class="term" style="font-size:34px">Nice roll</div><div class="hs">${headline}</div>`}
+    <div class="reward-xp">+${r.xpEarned} XP</div>
+    ${r.newAch.length?`<div class="reward-badges">${r.newAch.map(a=>`<div class="rb"><span class="rb-ic">${a.icon}</span><span class="rb-n">${a.name}</span><span class="rb-t">Achievement unlocked</span></div>`).join('')}</div>`:''}
+    <button class="next" id="ok">Keep going →</button>
+  </div></div>`;
+  $('#ok').onclick=()=>{ buzz(); closeOverlay(); render(); };
+}
+function countSuccess(d){ const def=DRILLS[d.type]; const keys=def.outcomes.filter(o=>o.success).map(o=>o.key); return d.putts.filter(p=>keys.includes(p)).length; }
+
+function startRoutine(){
+  const steps=[
+    { type:'gate',     balls:7, distance:null, label:'1 of 3 — Start line' },
+    { type:'make',     balls:7, distance:6,    label:'2 of 3 — Makes @6ft' },
+    { type:'goodzone', balls:7, distance:null, label:'3 of 3 — Good zone' }
+  ];
+  const first=steps.shift();
+  startDrill(first.type, first.balls, first.distance, { steps, collected:[], label:first.label });
+}
+
+/* ============================================================
+   COURSE MODE — 18 holes, golf scoring, progress tracking
+   ============================================================ */
+function openCourse(id){
+  const c=COURSES[id]; const p=(Store.get().courses||{})[id];
+  ovRoot.innerHTML=`<div class="overlay">
+    <div class="ov-top">
+      <div><div class="name">${c.name}</div><div class="sub">${c.level} · 18 holes</div></div>
+      <button class="iconbtn" id="close">✕</button>
+    </div>
+    <div style="padding:8px 18px 0">
+      <div class="course-hero">
+        <div><div class="ch-k">Best</div><div class="ch-v">${p?toParStr(p.best):'—'}</div></div>
+        <div><div class="ch-k">Medal</div><div class="ch-v" style="color:${p&&p.medal?MEDAL[p.medal].col:'var(--muted)'}">${p&&p.medal?MEDAL[p.medal].star:'—'}</div></div>
+        <div><div class="ch-k">Plays</div><div class="ch-v">${p?p.plays:0}</div></div>
+      </div>
+      <p style="color:var(--muted);font-size:13px;margin:13px 2px 4px">${c.blurb} Shoot under par — beat each hole's target to go low.</p>
+      <div class="hole-legend">🎯 PAR = makes needed to tie a hole · make more to go under</div>
+    </div>
+    <div class="holelist">
+      <div class="holeline hl-head"><span class="hno">#</span><span class="hnm">Hole</span><span class="htask">What to do</span><span class="hpar">Par</span></div>
+      ${c.holes.map((h,i)=>`<div class="holeline">
+        <span class="hno">${i+1}</span><span class="hnm">${h.name}</span>
+        <span class="htask">${taskLabel(h)}</span><span class="hpar">PAR ${h.par}</span></div>`).join('')}
+    </div>
+    <div class="controls"><button class="finish" id="play">${p?'Play again →':'Start course →'}</button></div>
+  </div>`;
+  $('#close').onclick=closeOverlay;
+  $('#play').onclick=()=>{ buzz(); startCourse(id); };
+}
+
+function startCourse(id){
+  const c=COURSES[id];
+  activeCourse={ id, name:c.name, holeIndex:0, scorecard:[], drills:[], toParSoFar:0 };
+  playHole();
+}
+function playHole(){
+  const c=COURSES[activeCourse.id];
+  const hole=c.holes[activeCourse.holeIndex];
+  startDrill(hole.type, hole.balls, hole.dist, null, { course:activeCourse, hole, holeNo:activeCourse.holeIndex+1 });
+}
+function scoreHole(drill){
+  const hole=run.hole, def=DRILLS[hole.type];
+  const keys=def.outcomes.filter(o=>o.success).map(o=>o.key);
+  const successes=drill.putts.filter(p=>keys.includes(p)).length;
+  let score=hole.par-successes; if(score<-4)score=-4; if(score>5)score=5;
+  activeCourse.scorecard.push({ no:activeCourse.holeIndex+1, name:hole.name, par:hole.par, balls:hole.balls, successes, score });
+  activeCourse.drills.push(drill);
+  activeCourse.toParSoFar+=score;
+  renderHoleResult(score);
+}
+function renderHoleResult(score){
+  const [term,cls]=holeTerm(score);
+  const col = cls==='good'?'var(--green)':cls==='long'?'var(--amber)':'var(--clay)';
+  const running=activeCourse.toParSoFar;
+  const last=activeCourse.holeIndex>=17;
+  const sh=activeCourse.scorecard[activeCourse.scorecard.length-1];
+  const parPhrase = score===0?'Right on par' : score<0?`${Math.abs(score)} under par` : `${score} over par`;
+  ovRoot.innerHTML=`<div class="overlay"><div class="result">
+    <div class="term" style="color:${col}">${term}</div>
+    <div class="hres-made">${sh.successes} of ${sh.balls} made · needed ${sh.par} for par</div>
+    <div class="hres-par" style="color:${col}">${parPhrase} on ${sh.name}</div>
+    <div class="runlbl" style="margin-top:24px">through ${activeCourse.holeIndex+1} holes</div>
+    <div class="run" style="color:${running<0?'var(--green)':running>0?'var(--amber)':'var(--ink)'}">${toParStr(running)}</div>
+    <div class="runlbl" style="margin-top:4px;letter-spacing:.14em">total to par</div>
+    <button class="next" id="next">${last?'See scorecard →':'Next hole →'}</button>
+  </div></div>`;
+  $('#next').onclick=()=>{ buzz(); activeCourse.holeIndex++; last?finishCourse():playHole(); };
+}
+function finishCourse(){
+  const toPar=activeCourse.toParSoFar;
+  const medal=medalFor(toPar);
+  const prog=Store.courseResult(activeCourse.id, toPar, medal);
+  Store.addSession({ id:Date.now(), date:new Date().toISOString(), course:true,
+    courseId:activeCourse.id, courseName:activeCourse.name, toPar, medal,
+    scorecard:activeCourse.scorecard.slice(), drills:activeCourse.drills.slice() });
+  // XP: reps + base + under-par + medal + new best
+  const repXP=activeCourse.drills.reduce((a,d)=>a+d.putts.length*2+countSuccess(d)*3,0);
+  const xp = repXP + 50 + Math.max(0,-toPar)*8 + (medal?MEDAL_XP[medal]:0) + (prog.newBest?40:0);
+  const rewards=grantRewards(xp);
+  renderScorecard(toPar, medal, prog, rewards);
+  buzz(90);
+}
+function renderScorecard(toPar, medal, prog, rewards){
+  const sc=activeCourse.scorecard;
+  const courseId=activeCourse.id, courseName=activeCourse.name;
+  const out=sc.slice(0,9).reduce((a,h)=>a+h.score,0);
+  const inn=sc.slice(9).reduce((a,h)=>a+h.score,0);
+  const cell=h=>{ const cls=h.score<0?'u':h.score>0?'o':''; return `<div class="sc-cell ${cls}"><span class="n">${h.no}</span><span class="v">${toParStr(h.score)}</span></div>`; };
+  const m = medal?MEDAL[medal]:null;
+  ovRoot.innerHTML=`<div class="overlay">
+    <div class="ov-top">
+      <div><div class="name">${courseName}</div><div class="sub">Scorecard · 18 holes</div></div>
+      <button class="iconbtn" id="close">✕</button>
+    </div>
+    <div class="scorecard">
+      <div class="sc-medal">
+        ${m?`<div class="star" style="color:${m.col}">${m.star}</div><div class="mlbl">${m.lbl}</div>`:`<div class="star" style="color:var(--muted-2)">◷</div><div class="mlbl" style="font-size:18px;color:var(--muted)">Round complete</div>`}
+      </div>
+      <div class="sc-topar" style="color:${toPar<0?'var(--green)':toPar>0?'var(--amber)':'var(--ink)'}">${toParStr(toPar)}</div>
+      <div class="sc-sub">to par</div>
+      ${prog.newBest?`<div style="text-align:center"><span class="newbest">★ New personal best</span></div>`:`<div style="text-align:center;font-family:var(--mono);font-size:11px;color:var(--muted-2);margin-top:6px">best ${toParStr(prog.best)}</div>`}
+      <div class="sc-grid">${sc.slice(0,9).map(cell).join('')}</div>
+      <div class="sc-grid">${sc.slice(9).map(cell).join('')}</div>
+      <div class="biaslab" style="margin-top:10px"><span>front ${toParStr(out)}</span><span>back ${toParStr(inn)}</span></div>
+      <div class="sc-made">Putts made this round · <b>${sc.reduce((a,h)=>a+h.successes,0)}</b> of ${sc.reduce((a,h)=>a+h.balls,0)}</div>
+      <div class="sc-legend"><span><i class="u"></i>under par</span><span><i class="p"></i>par</span><span><i class="o"></i>over par</span></div>
+      ${rewards?`<div class="sc-reward">
+        <span class="sr-xp">+${rewards.xpEarned} XP</span>
+        ${rewards.leveledTo?`<span class="sr-lv">▲ Level ${rewards.leveledTo}</span>`:''}
+      </div>
+      ${rewards.newAch.length?`<div class="reward-badges" style="margin-top:10px">${rewards.newAch.map(a=>`<div class="rb"><span class="rb-ic">${a.icon}</span><span class="rb-n">${a.name}</span><span class="rb-t">Unlocked</span></div>`).join('')}</div>`:''}`:''}
+    </div>
+    <div class="controls" style="display:flex;gap:10px">
+      <button class="obtn neutral" id="again" style="flex:1;padding:15px">Play again</button>
+      <button class="finish" id="done" style="flex:2;margin:0">Done</button>
+    </div>
+  </div>`;
+  $('#close').onclick=()=>{ closeOverlay(); view='practice'; render(); };
+  $('#done').onclick=()=>{ closeOverlay(); view='practice'; render(); toast(`${courseName} · ${toParStr(toPar)}`); };
+  $('#again').onclick=()=>{ buzz(); startCourse(courseId); };
+}
+
+function closeOverlay(){ ovRoot.innerHTML=''; run=null; setupState=null; activeCourse=null; }
+
+/* ---------- boot ---------- */
+render();
+
+/* ---------- service worker ---------- */
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+</script>
+</body>
+</html>
