@@ -138,9 +138,12 @@
   .runrow .undo{background:none;border:0;color:var(--muted);font-family:var(--mono);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;padding:4px}
   .runrow .undo:disabled{opacity:.3}
   .btn-row{display:flex;gap:10px}
+  .btn-row.many{gap:6px}
   .obtn{flex:1;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:15px;
     padding:18px 8px;font-family:var(--display);font-weight:600;font-size:16px;cursor:pointer;display:flex;
     flex-direction:column;align-items:center;gap:3px;transition:transform .1s,filter .1s;-webkit-user-select:none;user-select:none}
+  .btn-row.many .obtn{padding:13px 2px;font-size:13.5px;border-radius:12px;gap:2px}
+  .btn-row.many .obtn .k{font-size:8px;letter-spacing:.04em}
   .obtn:active{transform:scale(.95)}
   .obtn .k{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.7;font-weight:500}
   .obtn.good{background:rgba(70,201,138,.13);border-color:rgba(70,201,138,.4);color:var(--green)}
@@ -185,6 +188,12 @@
   .bias .s{background:rgba(224,106,92,.22);color:var(--clay)}
   .bias .g{background:rgba(70,201,138,.2);color:var(--green)}
   .bias .l{background:rgba(224,161,59,.18);color:var(--amber)}
+  .bias .z1{background:rgba(70,201,138,.14);color:var(--green)}
+  .bias .z2{background:rgba(70,201,138,.24);color:var(--green)}
+  .bias .z3{background:rgba(70,201,138,.34);color:#0A201A}
+  .shortrate{display:flex;align-items:baseline;gap:8px;margin:2px 0 12px}
+  .shortrate b{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--clay);line-height:1}
+  .shortrate span{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-2)}
   .biaslab{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);margin-top:7px}
   .spark{margin-top:6px}
 
@@ -359,6 +368,16 @@
   .r21-score .muted{color:var(--muted)}
   .r21-score b{color:var(--ink);font-weight:600}
 
+  /* ---------- zone games ---------- */
+  .zgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 2px}
+  .zbtn{background:var(--surface);border:1px solid var(--line);color:var(--ink);border-radius:12px;padding:14px 0;font-family:var(--mono);font-weight:600;font-size:16px;cursor:pointer;text-align:center;transition:transform .1s}
+  .zbtn:active{transform:scale(.94)}
+  .zbtn.short{grid-column:span 4;color:var(--clay);border-color:rgba(224,106,92,.36);background:rgba(224,106,92,.08);font-size:13px;padding:11px 0}
+  .zres{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:11px}
+  .zres span{font-family:var(--mono);font-size:11px;padding:3px 8px;border-radius:8px;border:1px solid var(--line);color:var(--muted-2)}
+  .zres span.pos{color:var(--green);border-color:rgba(70,201,138,.4)}
+  .zres span.neg{color:var(--clay);border-color:rgba(224,106,92,.36)}
+
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -423,13 +442,15 @@ const DRILLS = {
     ]
   },
   goodzone: {
-    id:'goodzone', name:'Good Zone', tag:'dist', tagLabel:'Distance',
-    desc:'Roll it past the hole into the good zone. Punish short, learn your bias.',
+    id:'goodzone', name:'Good Zone', tag:'dist', tagLabel:'Speed',
+    desc:'Roll it past the cup into the Wellputt Zone — land the downhill, level or uphill third. Never short.',
     needsDistance:false,
     outcomes:[
-      { key:'short', label:'Short', sub:'left short', cls:'bad' },
-      { key:'good',  label:'Good',  sub:'in the zone', cls:'good', success:true },
-      { key:'long',  label:'Long',  sub:'raced past', cls:'long' }
+      { key:'short', label:'Short', sub:'short',  cls:'bad' },
+      { key:'down',  label:'Down',  sub:'near',   cls:'good', success:true },
+      { key:'level', label:'Level', sub:'middle', cls:'good', success:true },
+      { key:'up',    label:'Up',    sub:'far',    cls:'good', success:true },
+      { key:'long',  label:'Long',  sub:'past',   cls:'long' }
     ]
   },
   gate: {
@@ -440,47 +461,67 @@ const DRILLS = {
       { key:'through', label:'Through', sub:'on your line', cls:'good', success:true },
       { key:'off',     label:'Off line',sub:'missed gate',  cls:'bad' }
     ]
+  },
+  zone: {
+    id:'zone', name:'Zone', tag:'dist', tagLabel:'Speed',
+    desc:'Stop the ball in the target numbered zone — pure speed control.',
+    needsDistance:false,
+    outcomes:[
+      { key:'zshort', label:'Short', sub:'before it', cls:'bad' },
+      { key:'zin',    label:'In zone',sub:'nailed it', cls:'good', success:true },
+      { key:'zpast',  label:'Past',  sub:'too far',   cls:'long' }
+    ]
   }
 };
-const DIST = [3,6,10]; // ft, the set positions on the 10ft mat
+const DIST = [3,4.5,6,7.5,10]; // ft, the set positions/marks on the 10ft mat
+// numbered speed zones printed on the 10ft Wellputt mat (1 = nearest behind hole → 12 = far end)
+const ZONES = [1,2,3,5,8,10,12];
+// the Wellputt "Good Zone" behind the hole is split into three thirds
+const GZ_PARTS = [
+  { key:'down',  label:'Downhill', short:'Down',  desc:'first third, nearest the cup — the downhill return putt' },
+  { key:'level', label:'Level',    short:'Level', desc:'middle third — a flat, level return putt' },
+  { key:'up',    label:'Uphill',   short:'Up',    desc:'far third, ~24in past — the uphill return putt' }
+];
+const GZ_GOOD = ['down','level','up','good']; // 'good' kept for older saved data
 
-/* ---------- 18-hole courses (3 levels, original holes built on the mat's real features) ---------- */
-const H = (name,type,dist,balls,par) => ({ name, type, dist, balls, par });
+/* ---------- 18-hole courses — the WellPutt progression (Orange → Blue → Black) ---------- */
+const H = (name,type,dist,balls,par) => ({ name, type, dist, balls, par });          // aim / gate / lag holes
+const Z = (name,zone,balls,par) => ({ name, type:'zone', dist:null, zone, balls, par }); // stop-in-zone holes
 const COURSES = {
-  green: {
-    name:'Home Green', level:'Foundations', tag:'acc',
-    blurb:'Short makes, clean starts, soft pace. Build the base.',
+  orange: {
+    name:'Orange Course', level:'Foundations', tag:'acc', gate:'Open',
+    blurb:'The WellPutt starter card — get a feel for both directions: hole out, then find the zones.',
     holes:[
-      H('Warm Up','make',3,4,3),  H('Center Cut','make',3,4,3), H('Gate Check','gate',null,4,3),
-      H('Six Footer','make',6,4,2),H('Lag Feel','goodzone',null,4,2),H('Short Stack','make',3,5,4),
-      H('Through It','gate',null,5,4),H('Zone In','goodzone',null,5,3),H('The Turn','make',6,4,2),
-      H('Steady','make',3,5,4),    H('Pace Lab','goodzone',null,5,3),H('Six Pack','make',6,5,3),
-      H('Line Up','gate',null,5,4),H('No Leaks','make',3,5,5),     H('Roll Past','goodzone',null,5,4),
-      H('Six & Sure','make',6,5,3),H('Lockdown','make',3,5,5),     H('Closer','make',6,5,3)
+      H('Warm Up','make',3,4,3),   H('Gate Check','gate',null,4,3), Z('Zone 1',1,4,2),
+      H('Four & Half','make',4.5,4,2), Z('Zone 2',2,4,2),           H('Lag In','goodzone',null,4,2),
+      H('Six Footer','make',6,4,2), Z('Zone 3',3,4,2),              H('The Turn','make',3,5,4),
+      Z('Zone 5',5,4,2),           H('Seven & Half','make',7.5,4,1), H('Zone Lag','goodzone',null,5,3),
+      H('Gate Speed','gate',null,5,4), Z('Zone 8',8,4,1),          H('Six Lock','make',6,5,3),
+      Z('Zone 2 · again',2,5,3),   H('Roll Past','goodzone',null,5,3), H('Closer','make',6,5,3)
     ]
   },
-  back: {
-    name:'Back Nine', level:'Sharpen', tag:'line',
-    blurb:'Mid-range under load. Tens make their first appearance.',
+  blue: {
+    name:'Blue Course', level:'The Wellputt Zone', tag:'dist', gate:'Unlocks after Orange',
+    blurb:'Discover the Wellputt Zone — every hole is speed. Finish past the cup, in the zone you called.',
     holes:[
-      H('Loosen','make',6,4,3),    H('Gate Speed','gate',null,5,4),H('Ten Peek','make',10,4,1),
-      H('Zone Pro','goodzone',null,5,4),H('Six Lock','make',6,5,4),H('Ladder Base','make',3,5,5),
-      H('Mid Range','make',6,5,3), H('Tens','make',10,5,2),        H('Pace Master','goodzone',null,5,4),
-      H('Pure Line','gate',null,5,5),H('Six Under','make',6,5,4),  H('Long Look','make',10,5,2),
-      H('Zone Tight','goodzone',null,6,5),H('Pressure 6','make',6,5,5),H('Tenacity','make',10,5,3),
-      H('Gate Money','gate',null,5,5),H('Clutch Six','make',6,6,5),H('Sign It','make',10,5,3)
+      H('Zone Start','goodzone',null,4,3), Z('Zone 3',3,4,2),      Z('Zone 5',5,4,2),
+      H('Six to Zone','goodzone',null,4,2), Z('Zone 8',8,4,2),     H('Half Break','make',4.5,4,2),
+      Z('Zone 2',2,4,3),           H('Lag Seven','goodzone',null,5,3), Z('Zone 10',10,4,1),
+      Z('Zone 1',1,4,3),           H('Roll Zone','goodzone',null,5,3), Z('Zone 5 · again',5,5,2),
+      H('Six Zone','goodzone',null,5,3), Z('Zone 8 · again',8,5,2), H('Long Lag','goodzone',null,5,3),
+      Z('Zone 10 · again',10,5,2), Z('Zone 12',12,5,1),            Z('Zone Finale',8,6,3)
     ]
   },
-  tour: {
-    name:'Tour Card', level:'Pressure', tag:'dist',
-    blurb:'Must-make holes and full-length lag. No soft spots.',
+  black: {
+    name:'Black Course', level:'Pressure', tag:'line', gate:'Unlocks after Blue',
+    blurb:'The advanced card — two of three, longer lags and the far zones. Own your pace.',
     holes:[
-      H('Stinger','make',6,5,4),   H('Ten Start','make',10,5,3), H('No Misses','make',6,5,5),
-      H('Zone Lock','goodzone',null,6,5),H('Gate Perfect','gate',null,5,5),H('Ten Pack','make',10,6,3),
-      H('Six Money','make',6,6,5), H('Lag Tour','goodzone',null,6,5),H('Turn Tight','make',10,5,3),
-      H('Pure Six','make',6,6,6),  H('Ten Pressure','make',10,6,4),H('Through Clean','gate',null,6,6),
-      H('Zone Elite','goodzone',null,6,6),H('Six Flush','make',6,6,6),H('Long Money','make',10,6,4),
-      H('Clutch Zone','goodzone',null,6,5),H('Card Saver','make',6,6,6),H('Champion','make',10,6,5)
+      H('Downhill Third','goodzone',null,3,2), Z('Zone 5',5,3,2), H('Long Make','make',7.5,4,2),
+      Z('Zone 8',8,3,2),           H('Ten Peek','make',10,4,1),   H('Level Third','goodzone',null,4,3),
+      Z('Zone 10',10,4,2),         H('Six Money','make',6,5,4),   Z('Zone 12',12,4,1),
+      H('Uphill Third','goodzone',null,4,3), Z('Zone 2',2,4,3),   H('Ten Pack','make',10,5,2),
+      Z('Zone 8 · again',8,5,3),   H('Pure Six','make',6,5,4),    Z('Zone 10 · again',10,5,2),
+      Z('Long Zone',12,5,1),       H('Zone Lag','goodzone',null,5,3), Z('Champion',12,6,2)
     ]
   }
 };
@@ -494,7 +535,8 @@ function toParStr(t){ return t<0 ? '−'+Math.abs(t) : t===0 ? 'E' : '+'+t; }
 function holeTerm(s){ if(s<=-2)return['Eagle','good']; if(s===-1)return['Birdie','good']; if(s===0)return['Par','good']; if(s===1)return['Bogey','long']; if(s===2)return['Double','bad']; return['Triple+','bad']; }
 function taskLabel(h){
   if(h.type==='make') return `Make ${h.par} of ${h.balls} from ${h.dist}ft`;
-  if(h.type==='goodzone') return `${h.par} of ${h.balls} into the good zone`;
+  if(h.type==='goodzone') return `${h.par} of ${h.balls} into the Wellputt Zone`;
+  if(h.type==='zone') return `Stop ${h.par} of ${h.balls} in zone ${h.zone}`;
   return `${h.par} of ${h.balls} through the gate`;
 }
 
@@ -502,11 +544,14 @@ function taskLabel(h){
 const SETUP = {
   make:{
     3:{ from:'the 3FT mark', to:'the top hole', note:'Straight up the white centre line.' },
+    4.5:{ from:'the 4.5FT mark', to:'the top hole', note:'Use the dotted line to square your aim.' },
     6:{ from:'the 6FT mark', to:'the top hole', note:'Straight up the white centre line.' },
+    7.5:{ from:'the 7.5FT mark', to:'the top hole', note:'Use the dotted line to square your aim.' },
     10:{ from:'the far end (by the WELLPUTT logo)', to:'the top hole', note:'Full length of the mat — the 10ft putt.' }
   },
-  goodzone:{ from:'the 6FT mark', to:'the good zone', note:'Roll it past the hole so it stops in the green zone behind it — never leave it short.' },
-  gate:{ from:'the 3FT mark', to:'the gate', note:'Start the ball dead on the white line, between the two alignment marks by the hole.' }
+  goodzone:{ from:'the 6FT mark', to:'the Wellputt Zone', note:'Roll it past the hole into the zone behind it — read which third it settles in. Never leave it short.' },
+  gate:{ from:'the 3FT mark', to:'the gate', note:'Start the ball dead on the white line, between the two alignment marks by the hole.' },
+  zone:{ from:'the hole', to:'your target zone', note:'Putt the speed direction — stop the ball in the numbered zone you called.' }
 };
 function setupFor(type,dist){
   if(type==='make') return SETUP.make[dist]||SETUP.make[6];
@@ -532,8 +577,8 @@ function xpForDrill(drill){ return drill.putts.length*2 + countSuccess(drill)*3 
 const MEDAL_XP={ gold:60, silver:30, bronze:15 };
 
 /* ----- stat helpers for achievements ----- */
-function longestGoodRun(){ let best=0; for(const d of allDrills()){ if(d.type!=='goodzone')continue; let r=0; for(const p of d.putts){ if(p==='good'){r++;best=Math.max(best,r);} else r=0; } } return best; }
-function maxPuttsInDay(){ const m={}; for(const s of Store.get().sessions){ const k=s.date.slice(0,10); m[k]=(m[k]||0)+s.drills.reduce((a,d)=>a+d.putts.length,0); } return Math.max(0,...Object.values(m)); }
+function longestGoodRun(){ let best=0; for(const d of allDrills()){ if(d.type!=='goodzone')continue; let r=0; for(const p of d.putts){ if(GZ_GOOD.includes(p)){r++;best=Math.max(best,r);} else r=0; } } return best; }
+function maxPuttsInDay(){ const m={}; for(const s of Store.get().sessions){ const k=s.date.slice(0,10); m[k]=(m[k]||0)+(s.drills||[]).reduce((a,d)=>a+d.putts.length,0); } return Math.max(0,...Object.values(m)); }
 function bestTwentyOne(){ let b=0; for(const s of Store.get().sessions) if(s.routine) b=Math.max(b,s.score); return b; }
 function gatePerfect(){ for(const d of allDrills()){ if(d.type==='gate' && d.putts.length>=5 && d.putts.every(p=>p==='through')) return true; } return false; }
 function tenFtDrillMakes(){ let b=0; for(const d of allDrills()){ if(d.type==='make'&&d.distance===10) b=Math.max(b,d.putts.filter(p=>p==='make').length); } return b; }
@@ -550,7 +595,9 @@ const ACHIEVEMENTS=[
   { id:'streak30',   icon:'⚡', name:'Locked In',     desc:'Reach a 30-day streak.',prog:()=>[totals().streak,30],  check:()=>totals().streak>=30 },
   { id:'on_fire',    icon:'🎇', name:'On Fire',       desc:'Make 10 in a row from 6ft.', prog:()=>[bestRunMake(6),10], check:()=>bestRunMake(6)>=10 },
   { id:'pure_start', icon:'🎼', name:'Pure Start',    desc:'A perfect Start Line drill (5+ balls, all through).', check:gatePerfect },
-  { id:'zone_in',    icon:'🟢', name:'Zone Master',   desc:'10 good-zone putts in a row.', prog:()=>[longestGoodRun(),10], check:()=>longestGoodRun()>=10 },
+  { id:'zone_in',    icon:'🟢', name:'Zone Master',   desc:'10 Wellputt-Zone putts in a row.', prog:()=>[longestGoodRun(),10], check:()=>longestGoodRun()>=10 },
+  { id:'ladder_top', icon:'🪜', name:'Top of the Ladder', desc:`Reach zone ${ZONES[ZONES.length-1]} in Zone Ladder.`, prog:()=>[ladderBest(),ZONES[ZONES.length-1]], check:()=>ladderBest()>=ZONES[ZONES.length-1] },
+  { id:'zone_caller',icon:'📣', name:'Zone Caller',   desc:'Score 20+ in one Zone Call round.', prog:()=>[Math.max(0,zoneCallBest()||0),20], check:()=>(zoneCallBest()||0)>=20 },
   { id:'long_tom',   icon:'🗼', name:'Long Tom',      desc:'Make 5 from 10ft in one drill.', prog:()=>[tenFtDrillMakes(),5], check:()=>tenFtDrillMakes()>=5 },
   { id:'grinder',    icon:'⛏️', name:'Grinder',       desc:'Hit 50+ putts in one day.', prog:()=>[maxPuttsInDay(),50], check:()=>maxPuttsInDay()>=50 },
   { id:'the21club',  icon:'🎪', name:'The 21 Club',   desc:'Score 18+ on The 21.', prog:()=>[bestTwentyOne(),18], check:()=>bestTwentyOne()>=18 },
@@ -595,7 +642,7 @@ function toast(msg){
 function buzz(ms=12){ if(navigator.vibrate) try{navigator.vibrate(ms)}catch(e){} }
 
 /* ---------- stats engine ---------- */
-function allDrills(){ return Store.get().sessions.flatMap(s=>s.drills.map(d=>({...d,date:s.date}))); }
+function allDrills(){ return Store.get().sessions.flatMap(s=>(s.drills||[]).map(d=>({...d,date:s.date}))); }
 function computeStreak(){
   const days=[...new Set(Store.get().sessions.map(s=>s.date.slice(0,10)))].sort().reverse();
   if(!days.length) return 0;
@@ -624,12 +671,13 @@ function makeByDistance(){
   return out;
 }
 function goodZoneBias(){
-  let s=0,g=0,l=0;
+  const c={short:0,down:0,level:0,up:0,long:0};
   for(const d of allDrills()){
     if(d.type!=='goodzone') continue;
-    for(const p of d.putts){ if(p==='short')s++; else if(p==='good')g++; else l++; }
+    for(const p of d.putts){ if(p==='good')c.level++; else if(c[p]!=null)c[p]++; }
   }
-  return {s,g,l,tot:s+g+l};
+  const g=c.down+c.level+c.up;                 // total inside the Wellputt Zone
+  return { ...c, s:c.short, g, l:c.long, tot:c.short+g+c.long };
 }
 function startLineRate(){
   let through=0,tot=0;
@@ -639,6 +687,11 @@ function startLineRate(){
   }
   return {through,tot};
 }
+/* ----- zone game stats ----- */
+function gameSessions(game){ return Store.get().sessions.filter(s=>s.game===game); }
+function ladderBest(){ let b=0; for(const s of gameSessions('ladder')) b=Math.max(b, s.best||0); return b; }
+function zoneCallBest(){ let b=null; for(const s of gameSessions('zonecall')){ if(b==null||s.score>b) b=s.score; } return b; }
+function zoneCallShortRate(){ let short=0,tot=0; for(const s of gameSessions('zonecall')) for(const r of (s.results||[])){ tot++; if(r.pts<0) short++; } return {short,tot}; }
 function totals(){
   const ds=allDrills();
   const putts=ds.reduce((a,d)=>a+d.putts.length,0);
@@ -657,7 +710,7 @@ function recentMakeSeries(limit=12){
   const arr=[];
   for(const s of Store.get().sessions){
     let made=0,tot=0;
-    for(const d of s.drills){ if(d.type==='make'){ tot+=d.putts.length; made+=d.putts.filter(p=>p==='make').length; } }
+    for(const d of (s.drills||[])){ if(d.type==='make'){ tot+=d.putts.length; made+=d.putts.filter(p=>p==='make').length; } }
     if(tot) arr.push(pct(made,tot));
   }
   return arr.slice(0,limit).reverse();
@@ -702,7 +755,7 @@ function renderPractice(){
 
   const cardStat = (id)=>{
     if(id==='make') return overall!=null?`<b>${overall}%</b> make rate · all distances`:`No reps yet`;
-    if(id==='goodzone') return gz.tot?`<b>${pct(gz.g,gz.tot)}%</b> in the good zone`:`No reps yet`;
+    if(id==='goodzone') return gz.tot?`<b>${pct(gz.g,gz.tot)}%</b> in the Wellputt Zone`:`No reps yet`;
     if(id==='gate') return sl.tot?`<b>${pct(sl.through,sl.tot)}%</b> on line`:`No reps yet`;
   };
 
@@ -741,11 +794,29 @@ function renderPractice(){
       <div class="ct">
         <div>
           <h3>The 21</h3>
-          <p>7 start-line · 7 makes from 6ft · 7 good-zone. One pass, one number.</p>
+          <p>7 start-line · 7 makes from 6ft · 7 Wellputt-Zone. One pass, one number.</p>
         </div>
         <span class="pill acc">▶ Start</span>
       </div>
       <div class="stat">${(()=>{const r=lastRoutine();return r?`Last: <b style="margin-left:2px">${r.score}/21</b> &nbsp;·&nbsp; ${fmtDay(r.date.slice(0,10))}`:'Your warm-up before every range trip'})()}</div>
+    </div>
+
+    <div class="sect-label">Zone games</div>
+    <div class="grid">
+      <div class="card" data-game="ladder">
+        <div class="ct">
+          <div><h3>Zone Ladder</h3><p>Climb the numbered zones — clear one, move to the next. A miss resets you.</p></div>
+          <span class="pill dist">Speed</span>
+        </div>
+        <div class="stat">${(()=>{const b=ladderBest();return b?`Best <b>zone ${b}</b> reached`:'Speed-control ladder to the top zone'})()}</div>
+      </div>
+      <div class="card" data-game="zonecall">
+        <div class="ct">
+          <div><h3>Zone Call</h3><p>Call a zone, stop it there. Short costs points — never leave it short.</p></div>
+          <span class="pill dist">Speed</span>
+        </div>
+        <div class="stat">${(()=>{const b=zoneCallBest();return b!=null?`Best <b>${b} pts</b>`:'Announce-and-commit points game'})()}</div>
+      </div>
     </div>
 
     <div class="sect-label">Courses · 18 holes</div>
@@ -784,6 +855,7 @@ function renderPractice(){
     <div class="footnote">GolfIQ suite · WellPutt 10ft</div>
   `;
   screen.querySelectorAll('[data-drill]').forEach(c=>c.onclick=()=>{ buzz(); openSetup(c.dataset.drill); });
+  screen.querySelectorAll('[data-game]').forEach(c=>c.onclick=()=>{ buzz(); c.dataset.game==='ladder'?openZoneLadderIntro():openZoneCallIntro(); });
   screen.querySelectorAll('[data-course]').forEach(c=>c.onclick=()=>{ buzz(); openCourse(c.dataset.course); });
   const mg=screen.querySelector('[data-guide]'); if(mg) mg.onclick=()=>{ buzz(); openMatGuide(); };
   const lc=screen.querySelector('.lvchip'); if(lc) lc.onclick=()=>{ buzz(8); view='rewards'; render(); };
@@ -847,33 +919,43 @@ function matThumbSVG(){
   </svg>`;
 }
 function matGuideSVG(){
-  const W=230,H=540, lx=54,lw=122, cx=W/2, top=18, bot=H-18;
-  const hole=88, gzTop=26, gzBot=hole-12;
-  const spots=[ {y:196,lab:'3FT',c:'#46C98A',t:'Make · Gate start'}, {y:300,lab:'6FT',c:'#E0A13B',t:'Make · Good zone start'}, {y:470,lab:'10ft',c:'#7FC8FF',t:'Long make · far end'} ];
-  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="max-height:52vh">
+  const W=252,H=600, lx=70,lw=118, cx=lx+lw/2, top=20, bot=H-20;
+  const hy=Math.round(top+(bot-top)*0.52);            // the hole
+  const zoneH=66, zTop=hy-zoneH, partH=zoneH/3;        // 3-part Wellputt Zone just past the hole
+  const zAreaTop=top+16, zAreaBot=zTop-10;             // numbered speed zones above it
+  const zy=i=>zAreaBot-(i/(ZONES.length-1))*(zAreaBot-zAreaTop);
+  const marks=[{lab:'3',f:0.16,c:'#46C98A'},{lab:'4.5',f:0.32,c:'#46C98A'},{lab:'6',f:0.5,c:'#E0A13B'},{lab:'7.5',f:0.68,c:'#E0A13B'},{lab:'10',f:0.94,c:'#7FC8FF'}];
+  const my=f=>hy+(bot-8-hy)*f;
+  const part=(y,t,op)=>`<rect x="${lx}" y="${y}" width="${lw}" height="${partH}" fill="rgba(70,201,138,${op})"/>
+      <text x="${lx+lw-6}" y="${y+partH/2+3}" text-anchor="end" fill="#6E8F7E" font-family="ui-monospace,monospace" font-size="8" letter-spacing="1">${t}</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="max-height:56vh">
+    <defs><marker id="ar" markerWidth="9" markerHeight="9" refX="4" refY="4" orient="auto"><path d="M1 1 L6 4 L1 7" fill="none" stroke="#6E8F7E" stroke-width="1.3"/></marker></defs>
     <rect x="${lx}" y="${top}" width="${lw}" height="${bot-top}" rx="16" fill="#0E2A22" stroke="#26483D"/>
-    <rect x="${lx}" y="${gzTop}" width="${lw}" height="${gzBot-gzTop}" fill="rgba(70,201,138,.14)"/>
-    <text x="${cx}" y="${(gzTop+gzBot)/2+3}" text-anchor="middle" fill="#46C98A" font-family="ui-monospace,monospace" font-size="9" opacity=".8" letter-spacing="2">GOOD ZONE</text>
-    <line x1="${cx}" y1="${top+6}" x2="${cx}" y2="${bot-6}" stroke="#9DB3A6" stroke-opacity=".3" stroke-dasharray="2 7"/>
-    <circle cx="${cx}" cy="${hole}" r="8" fill="#0A201A" stroke="#F4D03F" stroke-width="2.4"/>
-    <text x="${cx}" y="${hole+24}" text-anchor="middle" fill="#F2EBDA" font-family="ui-monospace,monospace" font-size="10" letter-spacing="2">HOLE</text>
-    <path d="M ${lx-16} ${bot-40} L ${lx-16} ${hole+28}" stroke="#6E8F7E" stroke-width="1.5" marker-end="url(#ar)"/>
-    <defs><marker id="ar" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M1 1 L6 4 L1 7" fill="none" stroke="#6E8F7E" stroke-width="1.3"/></marker></defs>
-    <text x="${lx-22}" y="${(bot+hole)/2}" text-anchor="middle" fill="#6E8F7E" font-family="ui-monospace,monospace" font-size="9" letter-spacing="2" transform="rotate(-90 ${lx-22} ${(bot+hole)/2})">PUTT THIS WAY</text>
-    ${spots.map(s=>`
-      <circle cx="${cx}" cy="${s.y}" r="6" fill="${s.c}"/>
-      <line x1="${lx}" y1="${s.y}" x2="${lx+lw}" y2="${s.y}" stroke="${s.c}" stroke-opacity=".35" stroke-dasharray="3 4"/>
-      <text x="${lx+lw+8}" y="${s.y+4}" fill="${s.c}" font-family="ui-monospace,monospace" font-size="12" font-weight="600">${s.lab}</text>
-    `).join('')}
+    <line x1="${cx}" y1="${top+6}" x2="${cx}" y2="${bot-6}" stroke="#9DB3A6" stroke-opacity=".28" stroke-dasharray="2 7"/>
+    ${part(zTop,'UP',0.30)}${part(zTop+partH,'LEVEL',0.20)}${part(zTop+2*partH,'DOWN',0.12)}
+    <line x1="${lx}" y1="${zTop}" x2="${lx+lw}" y2="${zTop}" stroke="#E0A13B" stroke-opacity=".45" stroke-dasharray="3 4"/>
+    <text x="${lx+6}" y="${zTop+13}" fill="#46C98A" font-family="ui-monospace,monospace" font-size="8.5" opacity=".85" letter-spacing="1">GOOD ZONE</text>
+    ${ZONES.map((z,i)=>`<line x1="${lx}" y1="${zy(i)}" x2="${lx+lw}" y2="${zy(i)}" stroke="#7FC8FF" stroke-opacity=".22" stroke-dasharray="2 5"/>
+      <text x="${lx+lw+7}" y="${zy(i)+3}" fill="#7FC8FF" font-family="ui-monospace,monospace" font-size="9" opacity=".9">${z}</text>`).join('')}
+    <text x="${cx}" y="${zAreaTop-6}" text-anchor="middle" fill="#7FC8FF" font-family="ui-monospace,monospace" font-size="8.5" opacity=".75" letter-spacing="2">SPEED ZONES</text>
+    <circle cx="${cx}" cy="${hy}" r="8" fill="#0A201A" stroke="#F4D03F" stroke-width="2.4"/>
+    <text x="${lx-10}" y="${hy+3}" text-anchor="end" fill="#F2EBDA" font-family="ui-monospace,monospace" font-size="9" letter-spacing="1">HOLE</text>
+    ${marks.map(m=>{const y=my(m.f);return `<circle cx="${cx}" cy="${y}" r="5.5" fill="${m.c}"/>
+      <line x1="${lx}" y1="${y}" x2="${lx+lw}" y2="${y}" stroke="${m.c}" stroke-opacity=".3" stroke-dasharray="3 4"/>
+      <text x="${lx+lw+7}" y="${y+4}" fill="${m.c}" font-family="ui-monospace,monospace" font-size="11" font-weight="600">${m.lab}ft</text>`;}).join('')}
+    <path d="M ${lx-24} ${my(0.9)} L ${lx-24} ${hy+14}" stroke="#6E8F7E" stroke-width="1.4" marker-end="url(#ar)"/>
+    <text x="${lx-30}" y="${(my(0.9)+hy)/2}" text-anchor="middle" fill="#6E8F7E" font-family="ui-monospace,monospace" font-size="8.5" letter-spacing="2" transform="rotate(-90 ${lx-30} ${(my(0.9)+hy)/2})">AIM · HOLE OUT</text>
+    <path d="M ${lx+lw+30} ${hy-14} L ${lx+lw+30} ${zAreaTop+4}" stroke="#6E8F7E" stroke-width="1.4" marker-end="url(#ar)"/>
+    <text x="${lx+lw+36}" y="${(hy+zAreaTop)/2}" text-anchor="middle" fill="#6E8F7E" font-family="ui-monospace,monospace" font-size="8.5" letter-spacing="2" transform="rotate(90 ${lx+lw+36} ${(hy+zAreaTop)/2})">SPEED · INTO ZONES</text>
     <text x="${cx}" y="${bot-4}" text-anchor="middle" fill="#6E8F7E" font-family="ui-monospace,monospace" font-size="8" letter-spacing="3">WELLPUTT · 10FT</text>
   </svg>`;
 }
 function openMatGuide(){
   const rows=[
-    ['make',3],['make',6],['make',10],['goodzone',null],['gate',null]
+    ['make',3],['make',4.5],['make',6],['make',7.5],['make',10],['goodzone',null],['zone',null],['gate',null]
   ].map(([type,dist])=>{
     const s=setupFor(type,dist);
-    const name = type==='make'?`Make · ${dist}ft` : type==='goodzone'?'Good Zone' : 'Start Line';
+    const name = type==='make'?`Make · ${dist}ft` : type==='goodzone'?'Wellputt Zone' : type==='zone'?'Speed zones' : 'Start Line';
     return `<div class="mg-row">
       <div class="mg-name">${name}</div>
       <div class="mg-instr"><b>From ${s.from} → ${s.to}.</b> ${s.note}</div>
@@ -881,12 +963,20 @@ function openMatGuide(){
   }).join('');
   ovRoot.innerHTML=`<div class="overlay">
     <div class="ov-top">
-      <div><div class="name">Mat guide</div><div class="sub">Your WellPutt 10ft · where to putt from</div></div>
+      <div><div class="name">Mat guide</div><div class="sub">Your WellPutt 10ft · directions & zones</div></div>
       <button class="iconbtn" id="close">✕</button>
     </div>
     <div style="flex:1;overflow-y:auto;padding:4px 18px 18px;-webkit-overflow-scrolling:touch">
       <div style="display:grid;place-items:center;padding:6px 0 2px">${matGuideSVG()}</div>
-      <p style="color:var(--muted);font-size:13px;margin:6px 2px 14px;text-align:center">Two directions on one mat: putt <b style="color:var(--ink)">up to the hole</b> for accuracy, and <b style="color:var(--ink)">past it into the green zone</b> for distance control.</p>
+      <p style="color:var(--muted);font-size:13px;margin:6px 2px 14px;text-align:center">Two directions on one mat: putt <b style="color:var(--ink)">up to the hole</b> to work on aim, and <b style="color:var(--ink)">past it into the zones</b> for speed control.</p>
+      <div class="mg-row">
+        <div class="mg-name">The Wellputt Zone</div>
+        <div class="mg-instr"><b>12–24in behind the cup, split in three.</b> A putt with the pace to die in the <b>downhill</b>, <b>level</b>, or <b>uphill</b> third holds its line best and leaves a tap-in — never leave it short.</div>
+      </div>
+      <div class="mg-row">
+        <div class="mg-name">The numbered zones</div>
+        <div class="mg-instr"><b>Speed targets ${ZONES[0]}→${ZONES[ZONES.length-1]} up the mat.</b> Each zone is worth its number. Call a zone and stop the ball there — the heart of Zone Ladder and Zone Call.</div>
+      </div>
       ${rows}
     </div>
   </div>`;
@@ -900,6 +990,7 @@ function renderStats(){
   if(!t.putts){ screen.innerHTML=header('Stats','Telemetry from every rep')+emptyState('📈','No data yet','Log a drill and your make rates, bias and trends show up here.'); wireStatsEmpty(); return; }
   const md=makeByDistance(); const gz=goodZoneBias(); const sl=startLineRate();
   const series=recentMakeSeries();
+  const lb=ladderBest(), zc=zoneCallBest(), zcs=zoneCallShortRate();
 
   screen.innerHTML=header('Stats','Telemetry from every rep')+`
     <div class="kpis">
@@ -921,16 +1012,19 @@ function renderStats(){
     </div>
 
     <div class="panel">
-      <h4>Distance control bias</h4>
-      <p class="hint">Where your lag putts finish. Aim to live in the green.</p>
+      <h4>Speed control · Wellputt Zone</h4>
+      <p class="hint">Where your lag putts finish — live in the zone, never short.</p>
       ${gz.tot?`
+        <div class="shortrate"><b>${pct(gz.short,gz.tot)}%</b><span>came up short · the cardinal sin</span></div>
         <div class="bias">
-          <div class="s" style="flex:${gz.s||0.001}">${gz.s?pct(gz.s,gz.tot)+'%':''}</div>
-          <div class="g" style="flex:${gz.g||0.001}">${gz.g?pct(gz.g,gz.tot)+'%':''}</div>
-          <div class="l" style="flex:${gz.l||0.001}">${gz.l?pct(gz.l,gz.tot)+'%':''}</div>
+          <div class="s" style="flex:${gz.short||0.001}">${gz.short?pct(gz.short,gz.tot)+'%':''}</div>
+          <div class="z1" style="flex:${gz.down||0.001}">${gz.down?pct(gz.down,gz.tot)+'%':''}</div>
+          <div class="z2" style="flex:${gz.level||0.001}">${gz.level?pct(gz.level,gz.tot)+'%':''}</div>
+          <div class="z3" style="flex:${gz.up||0.001}">${gz.up?pct(gz.up,gz.tot)+'%':''}</div>
+          <div class="l" style="flex:${gz.long||0.001}">${gz.long?pct(gz.long,gz.tot)+'%':''}</div>
         </div>
-        <div class="biaslab"><span>◀ short</span><span>good zone</span><span>long ▶</span></div>`
-        :`<p class="hint" style="margin:0">No good-zone reps yet.</p>`}
+        <div class="biaslab"><span>◀ short</span><span>down</span><span>level</span><span>up</span><span>long ▶</span></div>`
+        :`<p class="hint" style="margin:0">No Wellputt Zone reps yet.</p>`}
     </div>
 
     <div class="panel">
@@ -942,6 +1036,14 @@ function renderStats(){
         <span class="pct">${sl.tot?`<b>${pct(sl.through,sl.tot)}%</b>`:'—'}</span>
       </div>
     </div>
+
+    ${(lb||zc!=null)?`<div class="panel">
+      <h4>Zone games</h4>
+      <p class="hint">Speed-control targeting on the numbered zones</p>
+      <div class="distrow"><span class="lab" style="width:auto;flex:1;font-family:var(--body);font-weight:600;font-size:14px">Zone Ladder</span><span class="pct">${lb?`best <b>zone ${lb}</b>`:'—'}</span></div>
+      <div class="distrow"><span class="lab" style="width:auto;flex:1;font-family:var(--body);font-weight:600;font-size:14px">Zone Call</span><span class="pct">${zc!=null?`best <b>${zc} pts</b>`:'—'}</span></div>
+      ${zcs.tot?`<div class="biaslab" style="margin-top:8px"><span>zone-call short rate</span><span>${pct(zcs.short,zcs.tot)}%</span></div>`:''}
+    </div>`:''}
 
     ${series.length>1?`<div class="panel"><h4>Make-rate trend</h4><p class="hint">Recent sessions, oldest → newest</p>${sparkline(series)}</div>`:''}
 
@@ -987,7 +1089,7 @@ function renderHistory(){
   for(const s of sessions){ const k=s.date.slice(0,10); (groups[k]=groups[k]||[]).push(s); }
   const days=Object.keys(groups).sort().reverse();
   screen.innerHTML=header('History','Every session, kept')+days.map(k=>{
-    const list=groups[k]; const putts=list.reduce((a,s)=>a+s.drills.reduce((b,d)=>b+d.putts.length,0),0);
+    const list=groups[k]; const putts=list.reduce((a,s)=>a+(s.drills||[]).reduce((b,d)=>b+d.putts.length,0),0);
     return `<div class="daygroup">
       <div class="dh"><span class="d">${fmtDay(k)}</span><span class="c">${putts} putts · ${list.length} session${list.length>1?'s':''}</span></div>
       ${list.map(sessionRow).join('')}
@@ -1007,6 +1109,17 @@ function sessionRow(s){
     return `<div class="hrow"><div class="l"><span class="t">The 21</span>
       <span class="s">${s.drills.map(d=>labelFor(d)).join(' · ')}</span></div>
       <div class="score">${s.score}<small>/21</small></div></div>`;
+  }
+  if(s.game==='ladder'){
+    return `<div class="hrow"><div class="l"><span class="t">Zone Ladder</span>
+      <span class="s">${time(s.date)} · ${s.attempts} attempts${s.ladders?` · ${s.ladders} full`:''}</span></div>
+      <div class="score">z${s.best||0}</div></div>`;
+  }
+  if(s.game==='zonecall'){
+    const col=s.score<0?'var(--clay)':'var(--green)';
+    return `<div class="hrow"><div class="l"><span class="t">Zone Call</span>
+      <span class="s">${time(s.date)} · ${s.balls} balls</span></div>
+      <div class="score" style="color:${col}">${s.score>0?'+':''}${s.score}<small> pts</small></div></div>`;
   }
   const d=s.drills[0]; const def=DRILLS[d.type];
   const succ=d.putts.filter(p=>def.outcomes.find(o=>o.key===p&&o.success)).length;
@@ -1049,7 +1162,7 @@ function renderSetup(def){
       <p style="color:var(--muted);font-size:14px;margin:0 0 6px">${def.desc}</p>
       ${def.needsDistance?`
         <div class="sheet-label">Distance off the mat</div>
-        <div class="seg" id="seg">${DIST.map(ft=>`<button data-d="${ft}" class="${setupState.distance===ft?'on':''}">${ft}<span class="u">FEET</span></button>`).join('')}</div>
+        <div class="seg" id="seg">${DIST.map(ft=>`<button data-d="${ft}" class="${setupState.distance===ft?'on':''}">${ft}<span class="u">FT</span></button>`).join('')}</div>
       `:''}
       <div class="setup-callout" id="callout">${setupCalloutHTML(setupState.type, setupState.distance)}</div>
       <div class="sheet-label">How many balls?</div>
@@ -1077,19 +1190,22 @@ function renderRun(){
   const succKeys=def.outcomes.filter(o=>o.success).map(o=>o.key);
   const succ=run.putts.filter(p=>succKeys.includes(p)).length;
   const live=pct(succ,done);
-  const metaLabel = run.type==='goodzone'?'in zone' : run.type==='gate'?'on line':'made';
+  const metaLabel = (run.type==='goodzone'||run.type==='zone')?'in zone' : run.type==='gate'?'on line':'made';
   const isCourse = !!run.course;
 
   const nameLine = isCourse ? run.hole.name : `${def.name}${run.type==='make'?` · ${run.distance}ft`:''}`;
   const subLine  = isCourse
     ? `Hole ${run.holeNo}/18 · ${taskLabel(run.hole)}`
     : `${run.queue?run.queue.label+' · ':''}ball ${Math.min(done+1,total)} of ${total}`;
-  const madeWord  = run.type==='goodzone'?'in the zone' : run.type==='gate'?'on your line':'putts made';
+  const madeWord  = (run.type==='goodzone'||run.type==='zone')?'in the zone' : run.type==='gate'?'on your line':'putts made';
   const remaining = total-done;
   const goalHTML = isCourse
-    ? `🎯 Sink ${run.hole.par} of ${total} to match par · ${run.hole.par+1}+ to go under`
+    ? (run.hole.type==='zone'
+        ? `🎯 Stop ${run.hole.par} of ${total} in zone ${run.hole.zone} · beat it to go under`
+        : `🎯 Sink ${run.hole.par} of ${total} to match par · ${run.hole.par+1}+ to go under`)
     : run.type==='make'    ? `🎯 Hole out from ${run.distance}ft — build your make streak`
-    : run.type==='goodzone'? `🎯 Finish past the hole, inside the good zone`
+    : run.type==='goodzone'? `🎯 Finish past the cup — land the downhill, level or uphill third`
+    : run.type==='zone'    ? `🎯 Stop every ball in the target numbered zone`
     :                        `🎯 Start every ball through the gate, on line`;
 
   let readoutHTML;
@@ -1124,7 +1240,7 @@ function renderRun(){
         <button class="undo" id="undo" ${done?'':'disabled'}>↶ undo</button>
       </div>
       ${remaining>0?`<div class="tap-hint">How did that putt finish?</div>`:''}
-      <div class="btn-row">
+      <div class="btn-row${def.outcomes.length>3?' many':''}">
         ${def.outcomes.map(o=>`<button class="obtn ${o.cls}" data-k="${o.key}">${o.label}${o.sub?`<span class="k">${o.sub}</span>`:''}</button>`).join('')}
       </div>
       ${done>=total?`<button class="finish" id="finish">${isCourse?'Score hole →':run.queue?'Next →':'Save session'}</button>`:''}
@@ -1141,7 +1257,8 @@ function renderRun(){
   const f=$('#finish'); if(f) f.onclick=finishRun;
 }
 function dotStyle(key){
-  const map={make:'--green',good:'--green',through:'--green',miss:'--clay',short:'--clay',off:'--clay',long:'--amber'};
+  const map={make:'--green',good:'--green',down:'--green',level:'--green',up:'--green',through:'--green',zin:'--green',
+             miss:'--clay',short:'--clay',off:'--clay',zshort:'--clay',long:'--amber',zpast:'--amber'};
   const c=map[key]||'--muted'; return `background:var(${c});border-color:var(${c})`;
 }
 
@@ -1150,16 +1267,30 @@ function laneSVG(run){
   const W=200,H=430, lx=46, lw=108, top=24, bot=H-24;
   const cx=W/2;
   // colors
-  const C={make:'#46C98A',good:'#46C98A',through:'#46C98A',miss:'#E06A5C',short:'#E06A5C',off:'#E06A5C',long:'#E0A13B'};
+  const C={make:'#46C98A',good:'#46C98A',down:'#46C98A',level:'#46C98A',up:'#46C98A',through:'#46C98A',zin:'#46C98A',
+           miss:'#E06A5C',short:'#E06A5C',off:'#E06A5C',zshort:'#E06A5C',long:'#E0A13B',zpast:'#E0A13B'};
   // zone bands depend on drill
-  let bands='', holeY, gateY, marks='';
+  let bands='', holeY, gateY, marks='', zoneTop, partH, zAreaTop, zAreaBot, targetY;
   if(run.type==='goodzone'){
-    holeY=top+(bot-top)*0.62;
-    const gzTop=top+(bot-top)*0.18, gzBot=holeY;          // good zone = past hole
-    bands=`<rect x="${lx}" y="${gzTop}" width="${lw}" height="${gzBot-gzTop}" fill="rgba(70,201,138,.12)"/>
-           <rect x="${lx}" y="${top}" width="${lw}" height="${gzTop-top}" fill="rgba(224,161,59,.08)"/>
-           <line x1="${lx}" y1="${gzTop}" x2="${lx+lw}" y2="${gzTop}" stroke="#E0A13B" stroke-opacity=".4" stroke-dasharray="3 4"/>`;
-    marks=`<text x="${cx}" y="${(gzTop+holeY)/2+4}" text-anchor="middle" fill="#46C98A" font-family="ui-monospace,monospace" font-size="9" opacity=".6" letter-spacing="2">GOOD ZONE</text>`;
+    holeY=top+(bot-top)*0.66;
+    zoneTop=top+(bot-top)*0.18; partH=(holeY-zoneTop)/3;      // three thirds of the Wellputt Zone
+    const upB=zoneTop, lvB=zoneTop+partH, dnB=zoneTop+2*partH; // up=far(top), level=mid, down=near hole
+    bands=`<rect x="${lx}" y="${zoneTop}" width="${lw}" height="${holeY-zoneTop}" fill="rgba(70,201,138,.12)"/>
+           <rect x="${lx}" y="${top}" width="${lw}" height="${zoneTop-top}" fill="rgba(224,161,59,.07)"/>
+           <line x1="${lx}" y1="${lvB}" x2="${lx+lw}" y2="${lvB}" stroke="#46C98A" stroke-opacity=".28" stroke-dasharray="2 4"/>
+           <line x1="${lx}" y1="${dnB}" x2="${lx+lw}" y2="${dnB}" stroke="#46C98A" stroke-opacity=".28" stroke-dasharray="2 4"/>
+           <line x1="${lx}" y1="${zoneTop}" x2="${lx+lw}" y2="${zoneTop}" stroke="#E0A13B" stroke-opacity=".4" stroke-dasharray="3 4"/>`;
+    const lab=(y,t)=>`<text x="${lx+lw-6}" y="${y}" text-anchor="end" fill="#6E8F7E" font-family="ui-monospace,monospace" font-size="8" letter-spacing="1">${t}</text>`;
+    marks=lab(upB+partH/2+3,'UP')+lab(lvB+partH/2+3,'LEVEL')+lab(dnB+partH/2+3,'DOWN');
+  } else if(run.type==='zone'){
+    holeY=bot-26; zAreaBot=holeY-10; zAreaTop=top+16;
+    const n=ZONES.length, tgt=(run.hole&&run.hole.zone)||1, ti=Math.max(0,ZONES.indexOf(tgt));
+    const zy=i=>zAreaBot-(i/(n-1))*(zAreaBot-zAreaTop);
+    targetY=zy(ti);
+    bands=ZONES.map((z,i)=>{ const y=zy(i), on=i===ti;
+      return `<line x1="${lx}" y1="${y}" x2="${lx+lw}" y2="${y}" stroke="${on?'#F4D03F':'#9DB3A6'}" stroke-opacity="${on?'.8':'.22'}" stroke-dasharray="${on?'':'2 4'}"/>
+        <text x="${lx-6}" y="${y+3}" text-anchor="end" fill="${on?'#F4D03F':'#6E8F7E'}" font-family="ui-monospace,monospace" font-size="9" font-weight="${on?'700':'400'}">${z}</text>`; }).join('');
+    bands+=`<rect x="${lx}" y="${targetY-9}" width="${lw}" height="18" fill="rgba(244,208,63,.12)"/>`;
   } else if(run.type==='gate'){
     gateY=top+(bot-top)*0.30; holeY=top+(bot-top)*0.30;
     bands=`<rect x="${cx-13}" y="${gateY-4}" width="3" height="8" rx="1.5" fill="#9DB3A6"/>
@@ -1175,8 +1306,16 @@ function laneSVG(run){
     let x=cx+((hash(i)%30)-15), y;
     if(run.type==='goodzone'){
       if(p==='short') y= holeY + 14 + (hash(i*7)%((bot-holeY)-20));
-      else if(p==='good') y= top+(bot-top)*0.20 + (hash(i*7)% (holeY-(top+(bot-top)*0.20)-8));
-      else y= top+6 + (hash(i*7)%((top+(bot-top)*0.16)-top));
+      else if(p==='down') y= (zoneTop+2*partH) + (hash(i*7)%(partH-4)) +2;
+      else if(p==='level') y= (zoneTop+partH) + (hash(i*7)%(partH-4)) +2;
+      else if(p==='up') y= zoneTop + (hash(i*7)%(partH-4)) +2;
+      else if(p==='good') y= zoneTop+6 + (hash(i*7)%(holeY-zoneTop-12));
+      else y= top+6 + (hash(i*7)%(zoneTop-top-2>4?zoneTop-top-2:6));
+    } else if(run.type==='zone'){
+      x=cx+((hash(i)%22)-11);
+      if(p==='zin') y=targetY + ((hash(i*7)%14)-7);
+      else if(p==='zshort') y=targetY + 16 + (hash(i*7)%Math.max(6,(holeY-targetY-18)));
+      else y=Math.max(top+6, targetY - 16 - (hash(i*7)%Math.max(6,(targetY-zAreaTop-6))));
     } else if(run.type==='gate'){
       if(p==='through'){ x=cx+((hash(i)%8)-4); y=gateY; }
       else { x=cx+(hash(i)%2? 1:-1)*(22+hash(i*3)%14); y=gateY+((hash(i*5)%20)-10); }
@@ -1324,6 +1463,146 @@ function startRoutine(){
 }
 
 /* ============================================================
+   ZONE GAMES — speed control on the numbered zones
+   ============================================================ */
+let game=null;
+let zcBalls=9;
+function pickTarget(prev){ let t,guard=0; do{ t=ZONES[Math.floor(Math.random()*ZONES.length)]; }while(t===prev && ZONES.length>1 && ++guard<20); return t; }
+
+/* ----- Zone Ladder ----- */
+function openZoneLadderIntro(){
+  const best=ladderBest();
+  ovRoot.innerHTML=`<div class="overlay">
+    <div class="ov-top"><div><div class="name">Zone Ladder</div><div class="sub">Speed control · one number</div></div><button class="iconbtn" id="close">✕</button></div>
+    <div style="flex:1;overflow-y:auto;padding:6px 18px 10px;-webkit-overflow-scrolling:touch">
+      <div class="r21-hero">
+        <div class="r21-big"><div class="n">${ZONES[ZONES.length-1]}</div><span class="u">top zone</span></div>
+        <div class="r21-body"><h3>Climb the zones.</h3><p>Start at zone ${ZONES[0]} and stop the ball in it. Clear a zone, climb to the next. Miss and you drop back to the bottom — how high can you get?</p>${best?`<div class="r21-last">Best so far <b>zone ${best}</b></div>`:''}</div>
+      </div>
+      <div class="r21-score"><span class="ic">🪜</span><div><b>The zones.</b> <span class="muted">Your mat is marked ${ZONES.join(' · ')} behind the hole. Putt the speed direction and read where each ball settles.</span></div></div>
+    </div>
+    <div class="controls"><button class="finish" id="go">Start Zone Ladder →</button></div>
+  </div>`;
+  $('#close').onclick=closeOverlay; $('#go').onclick=()=>{ buzz(); startLadder(); };
+}
+function startLadder(){ game={ mode:'ladder', idx:0, bestIdx:-1, ladders:0, attempts:0, ts:Date.now() }; renderLadder(); }
+function renderLadder(){
+  const g=game, target=ZONES[g.idx];
+  const bestZone=g.bestIdx>=0?ZONES[g.bestIdx]:'—';
+  const fauxRun={ type:'zone', hole:{zone:target}, putts:[] };
+  ovRoot.innerHTML=`<div class="overlay">
+    <div class="ov-top">
+      <div><div class="name">Zone Ladder</div><div class="sub">Climb ${ZONES[0]} → ${ZONES[ZONES.length-1]} · one miss resets</div></div>
+      <button class="iconbtn" id="close">✕</button>
+    </div>
+    <div class="readout">
+      <div class="big" style="color:var(--flag)">${target}<small> zone</small></div>
+      <div class="meta"><span class="k">best zone ${bestZone}</span><span class="v">${g.ladders} ladder${g.ladders===1?'':'s'}</span></div>
+    </div>
+    <div class="goal">🎯 Stop the ball in zone ${target} to climb to the next</div>
+    <div class="lane-wrap">${laneSVG(fauxRun)}</div>
+    <div class="controls">
+      <div class="repcount">On zone <b>${target}</b> · ${g.attempts} attempt${g.attempts===1?'':'s'} this session</div>
+      <div class="btn-row">
+        <button class="obtn good" id="reach">Reached<span class="k">stopped in zone</span></button>
+        <button class="obtn bad" id="missed">Missed<span class="k">short or long</span></button>
+      </div>
+      <button class="finish" id="fin">Finish session</button>
+    </div>
+  </div>`;
+  $('#close').onclick=()=>{ if(g.attempts && !confirm('Quit Zone Ladder? Progress won’t be saved.')) return; closeOverlay(); };
+  $('#reach').onclick=()=>ladderTap(true);
+  $('#missed').onclick=()=>ladderTap(false);
+  $('#fin').onclick=finishLadder;
+}
+function ladderTap(ok){
+  const g=game; g.attempts++; buzz();
+  if(ok){
+    g.bestIdx=Math.max(g.bestIdx,g.idx);
+    if(g.idx>=ZONES.length-1){ g.ladders++; g.idx=0; buzz(50); toast('Ladder complete! 🎉'); }
+    else g.idx++;
+  } else { g.idx=0; }
+  renderLadder();
+}
+function finishLadder(){
+  const g=game;
+  if(!g.attempts){ closeOverlay(); return; }
+  const bestZone=g.bestIdx>=0?ZONES[g.bestIdx]:0;
+  Store.addSession({ id:Date.now(), date:new Date().toISOString(), game:'ladder', best:bestZone, ladders:g.ladders, attempts:g.attempts, drills:[] });
+  const xp=bestZone*3 + g.ladders*20 + 10;
+  const r=grantRewards(xp);
+  game=null; buzz(60); celebrate(r, `Zone Ladder · best zone ${bestZone}`);
+}
+
+/* ----- Zone Call ----- */
+function openZoneCallIntro(){
+  const best=zoneCallBest();
+  ovRoot.innerHTML=`<div class="overlay">
+    <div class="ov-top"><div><div class="name">Zone Call</div><div class="sub">Announce · commit · score</div></div><button class="iconbtn" id="close">✕</button></div>
+    <div style="flex:1;overflow-y:auto;padding:6px 18px 10px;-webkit-overflow-scrolling:touch">
+      <div class="r21-hero">
+        <div class="r21-big"><div class="n">±</div><span class="u">points</span></div>
+        <div class="r21-body"><h3>Call your zone.</h3><p>Each ball, a target zone is called. Stop it there and score that zone’s number. Leave it short and you lose a point for every zone short. Race it past and you score nothing.</p>${best!=null?`<div class="r21-last">Best score <b>${best} pts</b></div>`:''}</div>
+      </div>
+      <div class="sect-label" style="margin-top:20px">How many balls?</div>
+      <div class="ballrow" id="zcballs">${[6,9,12].map(n=>`<button data-n="${n}" class="${zcBalls===n?'on':''}">${n}</button>`).join('')}</div>
+      <div class="r21-score"><span class="ic">🎯</span><div><b>Never short.</b> <span class="muted">Wellputt scoring rewards taking it past the hole — being short is the only thing that actively costs you points.</span></div></div>
+    </div>
+    <div class="controls"><button class="finish" id="go">Start Zone Call →</button></div>
+  </div>`;
+  $('#close').onclick=closeOverlay;
+  $('#zcballs').querySelectorAll('button').forEach(b=>b.onclick=()=>{ zcBalls=+b.dataset.n; openZoneCallIntro(); });
+  $('#go').onclick=()=>{ buzz(); startZoneCall(zcBalls); };
+}
+function startZoneCall(balls){ game={ mode:'zonecall', balls, results:[], target:pickTarget(null), score:0, ts:Date.now() }; renderZoneCall(); }
+function renderZoneCall(){
+  const g=game, done=g.results.length, total=g.balls, target=g.target, fin=done>=total;
+  const fauxRun={ type:'zone', hole:{zone:target}, putts:[] };
+  const scol=g.score>0?'var(--green)':g.score<0?'var(--clay)':'var(--ink)';
+  ovRoot.innerHTML=`<div class="overlay">
+    <div class="ov-top">
+      <div><div class="name">Zone Call</div><div class="sub">Ball ${Math.min(done+1,total)} of ${total} · call it, stop it there</div></div>
+      <button class="iconbtn" id="close">✕</button>
+    </div>
+    <div class="readout">
+      <div class="big" style="color:${scol}">${g.score>0?'+':''}${g.score}<small> pts</small></div>
+      <div class="meta"><span class="k">${done} of ${total} played</span><span class="v" style="color:var(--flag)">target zone ${target}</span></div>
+    </div>
+    <div class="goal">🎯 Land it in zone ${target} for +${target} · short costs points · long scores 0</div>
+    <div class="lane-wrap">${laneSVG(fauxRun)}</div>
+    <div class="controls">
+      ${fin?`<div class="repcount">All ${total} balls played — score it</div>`
+        :`<div class="tap-hint">Where did the ball stop?</div>
+      <div class="zgrid">
+        ${ZONES.map(z=>`<button class="zbtn" data-z="${z}">${z}</button>`).join('')}
+        <button class="zbtn short" data-z="short">Short of zone ${ZONES[0]}</button>
+      </div>`}
+      <div class="zres">${g.results.map(r=>`<span class="${r.pts>0?'pos':r.pts<0?'neg':''}">z${r.target}: ${r.pts>0?'+':''}${r.pts}</span>`).join('')}</div>
+      ${fin?`<button class="finish" id="fin">Save score →</button>`:''}
+    </div>
+  </div>`;
+  $('#close').onclick=()=>{ if(done && !confirm('Quit Zone Call? Score won’t be saved.')) return; closeOverlay(); };
+  ovRoot.querySelectorAll('.zbtn').forEach(b=>b.onclick=()=>zoneCallTap(b.dataset.z));
+  const f=$('#fin'); if(f) f.onclick=finishZoneCall;
+}
+function zoneCallTap(val){
+  const g=game; if(g.results.length>=g.balls) return;
+  const ti=ZONES.indexOf(g.target);
+  const ai = val==='short' ? -1 : ZONES.indexOf(+val);
+  let pts; if(ai===ti) pts=g.target; else if(ai<ti) pts=-(ti-ai); else pts=0;
+  g.results.push({ target:g.target, actual:val, pts }); g.score+=pts; buzz();
+  if(g.results.length<g.balls) g.target=pickTarget(g.target); else buzz(40);
+  renderZoneCall();
+}
+function finishZoneCall(){
+  const g=game;
+  Store.addSession({ id:Date.now(), date:new Date().toISOString(), game:'zonecall', score:g.score, balls:g.balls, results:g.results.slice(), drills:[] });
+  const xp=Math.max(0,g.score)+g.balls*2+10;
+  const r=grantRewards(xp);
+  game=null; buzz(60); celebrate(r, `Zone Call · ${g.score} pts`);
+}
+
+/* ============================================================
    COURSE MODE — 18 holes, golf scoring, progress tracking
    ============================================================ */
 function openCourse(id){
@@ -1340,7 +1619,7 @@ function openCourse(id){
         <div><div class="ch-k">Plays</div><div class="ch-v">${p?p.plays:0}</div></div>
       </div>
       <p style="color:var(--muted);font-size:13px;margin:13px 2px 4px">${c.blurb} Shoot under par — beat each hole's target to go low.</p>
-      <div class="hole-legend">🎯 PAR = makes needed to tie a hole · make more to go under</div>
+      <div class="hole-legend">🎯 PAR = balls needed to tie a hole · make more to go under · ${c.gate}</div>
     </div>
     <div class="holelist">
       <div class="holeline hl-head"><span class="hno">#</span><span class="hnm">Hole</span><span class="htask">What to do</span><span class="hpar">Par</span></div>
@@ -1446,7 +1725,7 @@ function renderScorecard(toPar, medal, prog, rewards){
   $('#again').onclick=()=>{ buzz(); startCourse(courseId); };
 }
 
-function closeOverlay(){ ovRoot.innerHTML=''; run=null; setupState=null; activeCourse=null; }
+function closeOverlay(){ ovRoot.innerHTML=''; run=null; setupState=null; activeCourse=null; game=null; }
 
 /* ---------- boot ---------- */
 render();

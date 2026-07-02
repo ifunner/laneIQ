@@ -8,19 +8,20 @@ A local-first Progressive Web App that turns reps on your **WellPutt 10ft mat** 
 
 ## What it does
 
-LaneIQ maps drills to the real marks on your WellPutt 10ft mat and scores every rep, so aimless putting becomes a session you can beat next time. Log makes, good-zone speed, and start-line reps; play golf-style courses on the mat; and watch your make rates, distance bias, and streaks move over time.
+LaneIQ maps drills to the real marks and **numbered zones** on your WellPutt 10ft mat and scores every rep, so aimless putting becomes a session you can beat next time. Log makes, Wellputt-Zone speed, and start-line reps; play the WellPutt zone games and courses; and watch your make rates, speed bias, and streaks move over time.
 
 No accounts, no servers. Everything stays on your device and works offline next to the mat.
 
 ## Features
 
-- **Three core drills, mapped to the mat** — **Make Test** (hole out from 3/6/10 ft), **Good Zone** (roll it past into the green zone — punish short), and **Start Line** (send it through the gate on your aim line).
-- **The 21** — a daily routine: 7 start-line · 7 makes from 6 ft · 7 good-zone. One pass, one number.
-- **18-hole courses** — three cards (**Home Green**, **Back Nine**, **Tour Card**) with golf-style to-par scoring, per-hole results, front/back totals, and gold/silver/bronze medals.
+- **Core drills, mapped to the mat** — **Make Test** (hole out from 3 / 4.5 / 6 / 7.5 / 10 ft), **Good Zone** (roll it past into the Wellputt Zone — and read which third it settles in: **downhill · level · uphill**), and **Start Line** (send it through the gate on your aim line).
+- **Zone games** — built on the mat's numbered speed zones: **Zone Ladder** (climb 1 → 12; a miss resets you) and **Zone Call** (announce a zone, stop it there — short costs points, WellPutt-style).
+- **The 21** — a daily routine: 7 start-line · 7 makes from 6 ft · 7 Wellputt-Zone. One pass, one number.
+- **18-hole courses** — the WellPutt progression: **Orange** (foundations), **Blue** (the Wellputt Zone), **Black** (pressure), mixing hole-outs, zone-finishes and stop-in-zone targets, with to-par scoring and gold/silver/bronze medals.
 - **Progression** — XP, levels, ranks, and unlockable achievements with progress bars.
-- **Stats** — make rate by distance, distance-control bias (short / good / long), start-line %, best runs, and a make-rate trend.
+- **Stats** — make rate by distance, speed control across the Wellputt Zone (short-rate + downhill / level / uphill), start-line %, zone-game bests, and a make-rate trend.
 - **History & streaks** — sessions grouped by day; day streak tracking; replay a course from any row.
-- **Mat guide** — a labelled diagram of where to stand and aim for every drill.
+- **Mat guide** — a labelled diagram of both play directions, the three-part Wellputt Zone, and the numbered speed zones.
 
 ## GolfIQ suite
 
