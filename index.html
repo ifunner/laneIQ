@@ -426,7 +426,34 @@ const Store = (() => {
       if(c.best==null || toPar<c.best){ c.best=toPar; c.medal=medal; newBest=true; }
       write(); return { newBest, best:c.best, bestMedal:c.medal };
     },
-    wipe(){ mem={ sessions:[], settings:{ balls:10 }, courses:{}, xp:0, achievements:{} }; write(); }
+    wipe(){ mem={ sessions:[], settings:{ balls:10 }, courses:{}, xp:0, achievements:{} }; write(); },
+    exportData(){ return { app:'laneiq', schema:1, exportedAt:new Date().toISOString(), data:JSON.parse(JSON.stringify(read())) }; },
+    importData(payload, mode){
+      // accept a wrapped backup ({app,schema,data}) or a raw state object
+      let inc = (payload && payload.data && payload.app==='laneiq') ? payload.data : payload;
+      if(!inc || typeof inc!=='object' || !Array.isArray(inc.sessions))
+        return { ok:false, message:'That file isn’t a LaneIQ backup.' };
+      const norm = s => ({ sessions:[], settings:{balls:10}, courses:{}, xp:0, achievements:{}, ...s });
+      inc = norm(inc);
+      if(mode==='replace'){ mem = norm(inc); write(); return { ok:true, sessions:mem.sessions.length, message:'Backup restored.' }; }
+      // merge — union sessions by content signature (ids can collide, so don't key on id alone)
+      const cur = read();
+      const sig = s => JSON.stringify(s);
+      const seen = new Set(cur.sessions.map(sig));
+      let added=0;
+      for(const s of inc.sessions){ const k=sig(s); if(!seen.has(k)){ seen.add(k); cur.sessions.push(s); added++; } }
+      cur.sessions.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+      cur.xp = Math.max(cur.xp||0, inc.xp||0);
+      for(const [id,dt] of Object.entries(inc.achievements||{})){ if(!cur.achievements[id] || String(dt)<String(cur.achievements[id])) cur.achievements[id]=dt; }
+      for(const [id,ic] of Object.entries(inc.courses||{})){
+        const cc = cur.courses[id] = cur.courses[id] || {best:null,medal:null,plays:0};
+        cc.plays = (cc.plays||0)+(ic.plays||0);
+        if(ic.best!=null && (cc.best==null || ic.best<cc.best)){ cc.best=ic.best; cc.medal=ic.medal; }
+        if(ic.lastDate && (!cc.lastDate || ic.lastDate>cc.lastDate)) cc.lastDate=ic.lastDate;
+      }
+      write();
+      return { ok:true, added, sessions:cur.sessions.length, message:`Merged — ${added} new session${added===1?'':'s'} added.` };
+    }
   };
 })();
 
@@ -987,7 +1014,7 @@ function openMatGuide(){
 /* ---------- STATS ---------- */
 function renderStats(){
   const t=totals();
-  if(!t.putts){ screen.innerHTML=header('Stats','Telemetry from every rep')+emptyState('📈','No data yet','Log a drill and your make rates, bias and trends show up here.'); wireStatsEmpty(); return; }
+  if(!t.putts){ screen.innerHTML=header('Stats','Telemetry from every rep')+emptyState('📈','No data yet','Log a drill and your make rates, bias and trends show up here.')+backupPanel(); wireStatsEmpty(); return; }
   const md=makeByDistance(); const gz=goodZoneBias(); const sl=startLineRate();
   const series=recentMakeSeries();
   const lb=ladderBest(), zc=zoneCallBest(), zcs=zoneCallShortRate();
@@ -1049,6 +1076,8 @@ function renderStats(){
 
     ${coursesPanel()}
 
+    ${backupPanel()}
+
     <button class="danger" id="wipe">Reset all data</button>
   `;
   wireStatsEmpty();
@@ -1063,7 +1092,61 @@ function coursesPanel(){
     </div>`; }).join('');
   return `<div class="panel"><h4>Courses</h4><p class="hint">Best to-par on each 18-hole card</p>${rows}</div>`;
 }
-function wireStatsEmpty(){ const w=$('#wipe'); if(w) w.onclick=()=>{ if(confirm('Delete all sessions and stats? This cannot be undone.')){ Store.wipe(); toast('Data reset'); render(); } }; }
+function wireStatsEmpty(){
+  const w=$('#wipe'); if(w) w.onclick=()=>{ if(confirm('Delete all sessions and stats? This cannot be undone.')){ Store.wipe(); toast('Data reset'); render(); } };
+  wireBackup();
+}
+function backupPanel(){
+  return `<div class="panel">
+    <h4>Backup & restore</h4>
+    <p class="hint">Your data lives only in this browser. Export a file to keep it safe, or restore it on a new device.</p>
+    <div class="btn-row" style="margin-top:6px">
+      <button class="obtn neutral" id="export">Export<span class="k">download .json</span></button>
+      <button class="obtn neutral" id="import">Import<span class="k">restore / merge</span></button>
+    </div>
+  </div>`;
+}
+function wireBackup(){
+  const e=$('#export'); if(e) e.onclick=()=>{ buzz(); exportBackup(); };
+  const i=$('#import'); if(i) i.onclick=()=>{ buzz(); openBackupImport(); };
+}
+function exportBackup(){
+  const payload=Store.exportData();
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=`laneiq-backup-${todayKey()}.json`;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); },0);
+  toast('Backup downloaded');
+}
+function openBackupImport(){
+  ovRoot.innerHTML=`<div class="overlay"><div style="padding:22px 20px calc(20px + var(--safe-b));display:flex;flex-direction:column;gap:14px">
+    <div class="ov-top" style="padding:0"><div><div class="name">Import backup</div><div class="sub">Restore from a .json file</div></div><button class="iconbtn" id="close">✕</button></div>
+    <p style="color:var(--muted);font-size:13.5px;line-height:1.5;margin:0">Pick how to bring in your backup file:</p>
+    <button class="obtn good" id="merge" style="flex:none;align-items:flex-start;text-align:left">Merge<span class="k">keep current data · add anything new</span></button>
+    <button class="obtn bad" id="replace" style="flex:none;align-items:flex-start;text-align:left">Replace<span class="k">wipe current data · use only the file</span></button>
+  </div></div>`;
+  $('#close').onclick=closeOverlay;
+  $('#merge').onclick=()=>importBackup('merge');
+  $('#replace').onclick=()=>{ if(confirm('Replace ALL current data with the imported file? This cannot be undone.')) importBackup('replace'); };
+}
+function importBackup(mode){
+  const inp=document.createElement('input');
+  inp.type='file'; inp.accept='application/json,.json';
+  inp.onchange=()=>{
+    const f=inp.files&&inp.files[0]; if(!f) return;
+    const rd=new FileReader();
+    rd.onload=()=>{
+      let obj; try{ obj=JSON.parse(rd.result); }catch(e){ toast('Couldn’t read that file'); return; }
+      const res=Store.importData(obj, mode);
+      if(!res.ok){ toast(res.message); return; }
+      closeOverlay(); view='stats'; render(); toast(res.message);
+    };
+    rd.readAsText(f);
+  };
+  inp.click();
+}
 
 function sparkline(vals){
   const W=300,H=70,pad=6; const max=Math.max(100,...vals),min=Math.min(...vals,0);
