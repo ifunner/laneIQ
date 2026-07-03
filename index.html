@@ -1121,12 +1121,17 @@ function exportBackup(){
   toast('Backup downloaded');
 }
 function openBackupImport(){
-  ovRoot.innerHTML=`<div class="overlay"><div style="padding:22px 20px calc(20px + var(--safe-b));display:flex;flex-direction:column;gap:14px">
-    <div class="ov-top" style="padding:0"><div><div class="name">Import backup</div><div class="sub">Restore from a .json file</div></div><button class="iconbtn" id="close">✕</button></div>
-    <p style="color:var(--muted);font-size:13.5px;line-height:1.5;margin:0">Pick how to bring in your backup file:</p>
-    <button class="obtn good" id="merge" style="flex:none;align-items:flex-start;text-align:left">Merge<span class="k">keep current data · add anything new</span></button>
-    <button class="obtn bad" id="replace" style="flex:none;align-items:flex-start;text-align:left">Replace<span class="k">wipe current data · use only the file</span></button>
-  </div></div>`;
+  ovRoot.innerHTML=`<div class="overlay">
+    <div class="ov-top">
+      <div><div class="name">Import backup</div><div class="sub">Restore from a .json file</div></div>
+      <button class="iconbtn" id="close">✕</button>
+    </div>
+    <div style="padding:8px 20px calc(20px + var(--safe-b));display:flex;flex-direction:column;gap:14px">
+      <p style="color:var(--muted);font-size:13.5px;line-height:1.5;margin:0">Pick how to bring in your backup file:</p>
+      <button class="obtn good" id="merge" style="flex:none;align-items:flex-start;text-align:left">Merge<span class="k">keep current data · add anything new</span></button>
+      <button class="obtn bad" id="replace" style="flex:none;align-items:flex-start;text-align:left">Replace<span class="k">wipe current data · use only the file</span></button>
+    </div>
+  </div>`;
   $('#close').onclick=closeOverlay;
   $('#merge').onclick=()=>importBackup('merge');
   $('#replace').onclick=()=>{ if(confirm('Replace ALL current data with the imported file? This cannot be undone.')) importBackup('replace'); };
