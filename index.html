@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0A201A" />
 <meta name="description" content="LaneIQ — putting practice tracker for the WellPutt 10ft mat. Part of the GolfIQ suite." />
 <title>LaneIQ — WellPutt Practice</title>
@@ -680,19 +680,16 @@ function buzz(ms=12){ if(navigator.vibrate) try{navigator.vibrate(ms)}catch(e){}
 /* ---------- stats engine ---------- */
 function allDrills(){ return Store.get().sessions.flatMap(s=>(s.drills||[]).map(d=>({...d,date:s.date}))); }
 function computeStreak(){
+  const DAY=864e5;
+  const noon=key=>new Date(key+'T12:00:00');       // anchor at noon so DST can't shift the day count
+  const daysBetween=(a,b)=>Math.round((noon(a)-noon(b))/DAY);
   const days=[...new Set(Store.get().sessions.map(s=>s.date.slice(0,10)))].sort().reverse();
   if(!days.length) return 0;
-  let streak=0; let cur=new Date(todayKey()+'T12:00:00');
-  // allow streak to count if last session was today or yesterday
-  const last=new Date(days[0]+'T12:00:00');
-  const gap=Math.round((cur-last)/864e5);
-  if(gap>1) return 0;
-  cur=last;
-  for(const day of days){
-    const dd=new Date(day+'T12:00:00');
-    if(Math.round((cur-dd)/864e5)<=0 && day===todayKey(cur)){ streak++; cur=new Date(cur-864e5); }
-    else break;
-  }
+  // streak is only live if the most recent active day was today or yesterday
+  if(daysBetween(todayKey(), days[0])>1) return 0;
+  // walk back through the active days, counting while each is exactly one day before the previous
+  let streak=1;
+  for(let i=1;i<days.length && daysBetween(days[i-1],days[i])===1;i++) streak++;
   return streak;
 }
 function makeByDistance(){
