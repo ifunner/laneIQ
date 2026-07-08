@@ -8,7 +8,7 @@
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0A201A",
-  "theme_color": "#0E2A22",
+  "theme_color": "#0A201A",
   "categories": ["sports", "health", "productivity"],
   "icons": [
     { "src": "icon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },

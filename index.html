@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0A201A" />
 <meta name="description" content="LaneIQ — putting practice tracker for the WellPutt 10ft mat. Part of the GolfIQ suite." />
 <title>LaneIQ — WellPutt Practice</title>
@@ -434,7 +434,19 @@ const Store = (() => {
       if(!inc || typeof inc!=='object' || !Array.isArray(inc.sessions))
         return { ok:false, message:'That file isn’t a LaneIQ backup.' };
       const norm = s => ({ sessions:[], settings:{balls:10}, courses:{}, xp:0, achievements:{}, ...s });
+      // coerce numeric fields + array fields so a hand-edited backup can't crash or inject at render time
+      const num = (v,d=0) => { const n=Number(v); return Number.isFinite(n)?n:d; };
+      const sanitizeSession = s => {
+        if(!s || typeof s!=='object') return null;
+        const out={ ...s };
+        out.drills=Array.isArray(s.drills)?s.drills.map(d=>({ ...d, putts:Array.isArray(d&&d.putts)?d.putts:[] })):[];
+        if(Array.isArray(s.results)) out.results=s.results;
+        for(const k of ['score','toPar','balls','attempts','ladders','best']) if(s[k]!=null) out[k]=num(s[k]);
+        return out;
+      };
       inc = norm(inc);
+      inc.sessions = inc.sessions.map(sanitizeSession).filter(Boolean);
+      inc.xp = num(inc.xp);
       if(mode==='replace'){ mem = norm(inc); write(); return { ok:true, sessions:mem.sessions.length, message:'Backup restored.' }; }
       // merge — union sessions by content signature (ids can collide, so don't key on id alone)
       const cur = read();
@@ -503,12 +515,7 @@ const DRILLS = {
 const DIST = [3,4.5,6,7.5,10]; // ft, the set positions/marks on the 10ft mat
 // numbered speed zones printed on the 10ft Wellputt mat (1 = nearest behind hole → 12 = far end)
 const ZONES = [1,2,3,5,8,10,12];
-// the Wellputt "Good Zone" behind the hole is split into three thirds
-const GZ_PARTS = [
-  { key:'down',  label:'Downhill', short:'Down',  desc:'first third, nearest the cup — the downhill return putt' },
-  { key:'level', label:'Level',    short:'Level', desc:'middle third — a flat, level return putt' },
-  { key:'up',    label:'Uphill',   short:'Up',    desc:'far third, ~24in past — the uphill return putt' }
-];
+// the Wellputt "Good Zone" behind the hole is split into three thirds: down / level / up
 const GZ_GOOD = ['down','level','up','good']; // 'good' kept for older saved data
 
 /* ---------- 18-hole courses — the WellPutt progression (Orange → Blue → Black) ---------- */
@@ -654,6 +661,8 @@ function grantRewards(xpEarned){
 /* ---------- util ---------- */
 const $ = s => document.querySelector(s);
 const pct = (n,d) => d? Math.round(n/d*100):0;
+// escape free-text that originates from imported backups before it hits innerHTML
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const todayKey = (dt=new Date()) => dt.toISOString().slice(0,10);
 function fmtDay(key){
   const d=new Date(key+'T12:00:00'); const t=todayKey();
@@ -671,19 +680,16 @@ function buzz(ms=12){ if(navigator.vibrate) try{navigator.vibrate(ms)}catch(e){}
 /* ---------- stats engine ---------- */
 function allDrills(){ return Store.get().sessions.flatMap(s=>(s.drills||[]).map(d=>({...d,date:s.date}))); }
 function computeStreak(){
+  const DAY=864e5;
+  const noon=key=>new Date(key+'T12:00:00');       // anchor at noon so DST can't shift the day count
+  const daysBetween=(a,b)=>Math.round((noon(a)-noon(b))/DAY);
   const days=[...new Set(Store.get().sessions.map(s=>s.date.slice(0,10)))].sort().reverse();
   if(!days.length) return 0;
-  let streak=0; let cur=new Date(todayKey()+'T12:00:00');
-  // allow streak to count if last session was today or yesterday
-  const last=new Date(days[0]+'T12:00:00');
-  const gap=Math.round((cur-last)/864e5);
-  if(gap>1) return 0;
-  cur=last;
-  for(const day of days){
-    const dd=new Date(day+'T12:00:00');
-    if(Math.round((cur-dd)/864e5)<=0 && day===todayKey(cur)){ streak++; cur=new Date(cur-864e5); }
-    else break;
-  }
+  // streak is only live if the most recent active day was today or yesterday
+  if(daysBetween(todayKey(), days[0])>1) return 0;
+  // walk back through the active days, counting while each is exactly one day before the previous
+  let streak=1;
+  for(let i=1;i<days.length && daysBetween(days[i-1],days[i])===1;i++) streak++;
   return streak;
 }
 function makeByDistance(){
@@ -1189,7 +1195,7 @@ function sessionRow(s){
   if(s.course){
     const m=s.medal?MEDAL[s.medal]:null;
     const col=s.toPar<0?'var(--green)':s.toPar>0?'var(--amber)':'var(--ink)';
-    return `<div class="hrow" data-replay="${s.courseId}"><div class="l"><span class="t">${s.courseName} ${m?`<span class="medal" style="--mc:${m.col};font-size:12px">${m.star}</span>`:''}</span>
+    return `<div class="hrow" data-replay="${esc(s.courseId)}"><div class="l"><span class="t">${esc(s.courseName)} ${m?`<span class="medal" style="--mc:${m.col};font-size:12px">${m.star}</span>`:''}</span>
       <span class="s">${time(s.date)} · 18 holes</span></div>
       <div class="score" style="color:${col}">${toParStr(s.toPar)}</div></div>`;
   }
@@ -1209,14 +1215,15 @@ function sessionRow(s){
       <span class="s">${time(s.date)} · ${s.balls} balls</span></div>
       <div class="score" style="color:${col}">${s.score>0?'+':''}${s.score}<small> pts</small></div></div>`;
   }
-  const d=s.drills[0]; const def=DRILLS[d.type];
-  const succ=d.putts.filter(p=>def.outcomes.find(o=>o.key===p&&o.success)).length;
-  const name=def.name+(d.type==='make'?` · ${d.distance}ft`:'');
+  const d=(s.drills||[])[0]; if(!d) return '';
+  const def=DRILLS[d.type]; const putts=d.putts||[];
+  const succ=def?putts.filter(p=>def.outcomes.find(o=>o.key===p&&o.success)).length:0;
+  const name=(def?def.name:esc(d.type||'Drill'))+(d.type==='make'?` · ${esc(d.distance)}ft`:'');
   return `<div class="hrow"><div class="l"><span class="t">${name}</span>
-    <span class="s">${time(s.date)} · ${d.putts.length} putts</span></div>
-    <div class="score">${succ}<small>/${d.putts.length}</small></div></div>`;
+    <span class="s">${time(s.date)} · ${putts.length} putts</span></div>
+    <div class="score">${succ}<small>/${putts.length}</small></div></div>`;
 }
-function labelFor(d){ const n=DRILLS[d.type].name.split(' ')[0]; const s=d.putts.filter(p=>DRILLS[d.type].outcomes.find(o=>o.key===p&&o.success)).length; return `${n} ${s}/${d.putts.length}`; }
+function labelFor(d){ const def=DRILLS[d.type]; const putts=d.putts||[]; const n=def?def.name.split(' ')[0]:esc(d.type||'Drill'); const s=def?putts.filter(p=>def.outcomes.find(o=>o.key===p&&o.success)).length:0; return `${n} ${s}/${putts.length}`; }
 function time(iso){ return new Date(iso).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); }
 
 function header(title,sub){
@@ -1268,7 +1275,7 @@ function renderSetup(def){
 let run=null; // {type,balls,distance,putts:[],queue:null,course?,hole?,holeNo?}
 let activeCourse=null;
 function startDrill(type,balls,distance,queue,ctx){
-  run={ type, balls, distance, putts:[], queue, ts:Date.now() };
+  run={ type, balls, distance, putts:[], queue };
   if(ctx){ run.course=ctx.course; run.hole=ctx.hole; run.holeNo=ctx.holeNo; }
   renderRun();
 }
@@ -1467,7 +1474,7 @@ function renderRewardPopup(r, headline){
   </div></div>`;
   $('#ok').onclick=()=>{ buzz(); closeOverlay(); render(); };
 }
-function countSuccess(d){ const def=DRILLS[d.type]; const keys=def.outcomes.filter(o=>o.success).map(o=>o.key); return d.putts.filter(p=>keys.includes(p)).length; }
+function countSuccess(d){ const def=DRILLS[d.type]; if(!def) return 0; const keys=def.outcomes.filter(o=>o.success).map(o=>o.key); return (d.putts||[]).filter(p=>keys.includes(p)).length; }
 
 /* ----- per-leg mini lane glyph (matches the app's lane visual, GolfIQ palette) ----- */
 function legMiniSVG(type){
@@ -1573,7 +1580,7 @@ function openZoneLadderIntro(){
   </div>`;
   $('#close').onclick=closeOverlay; $('#go').onclick=()=>{ buzz(); startLadder(); };
 }
-function startLadder(){ game={ mode:'ladder', idx:0, bestIdx:-1, ladders:0, attempts:0, ts:Date.now() }; renderLadder(); }
+function startLadder(){ game={ mode:'ladder', idx:0, bestIdx:-1, ladders:0, attempts:0 }; renderLadder(); }
 function renderLadder(){
   const g=game, target=ZONES[g.idx];
   const bestZone=g.bestIdx>=0?ZONES[g.bestIdx]:'—';
@@ -1642,7 +1649,7 @@ function openZoneCallIntro(){
   $('#zcballs').querySelectorAll('button').forEach(b=>b.onclick=()=>{ zcBalls=+b.dataset.n; openZoneCallIntro(); });
   $('#go').onclick=()=>{ buzz(); startZoneCall(zcBalls); };
 }
-function startZoneCall(balls){ game={ mode:'zonecall', balls, results:[], target:pickTarget(null), score:0, ts:Date.now() }; renderZoneCall(); }
+function startZoneCall(balls){ game={ mode:'zonecall', balls, results:[], target:pickTarget(null), score:0 }; renderZoneCall(); }
 function renderZoneCall(){
   const g=game, done=g.results.length, total=g.balls, target=g.target, fin=done>=total;
   const fauxRun={ type:'zone', hole:{zone:target}, putts:[] };

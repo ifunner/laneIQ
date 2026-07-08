@@ -1,6 +1,6 @@
 /* LaneIQ service worker — offline-ready app shell.
    Bump CACHE when the shell changes to invalidate old caches. */
-const CACHE = 'laneiq-v2';
+const CACHE = 'laneiq-v3';
 const SHELL = [
   './',
   './index.html',
